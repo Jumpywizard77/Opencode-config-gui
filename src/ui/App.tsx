@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Issue } from "../core/types";
 import { getConfig, getState, type StatePayload } from "./api";
 import { ConfigPicker } from "./components/ConfigPicker";
+import { detectDocShape, ProviderList } from "./components/ProviderList";
 import { RawJsonTab } from "./components/RawJsonTab";
 import { Toast, type ToastMessage } from "./components/Toast";
 import { ValidationPanel } from "./components/ValidationPanel";
@@ -36,7 +37,7 @@ export type ToastKind = "info" | "error";
 type TabId = "providers" | "mcp" | "raw";
 
 const TABS: { id: TabId; label: string; placeholder: string | null }[] = [
-  { id: "providers", label: "Providers", placeholder: "Providers editing — coming in a later task." },
+  { id: "providers", label: "Providers", placeholder: null },
   { id: "mcp", label: "MCP", placeholder: "MCP editing — coming in a later task." },
   { id: "raw", label: "Raw JSON", placeholder: null },
 ];
@@ -53,6 +54,9 @@ export function App() {
   // The editor re-seeds on THIS counter, not on text identity, so a reload
   // whose text happens to equal what we hold still resets the textarea.
   const [loadNonce, setLoadNonce] = useState(0);
+  // Unsaved structured edits live in the Providers tab's state; a tab switch
+  // (remount) discards them, so App confirms first while this is true.
+  const [providersDirty, setProvidersDirty] = useState(false);
   const toastId = useRef(0);
   // Sequence guard for selectConfig (the state effect's cancelled-flag
   // pattern for a callback): only the latest load may apply.
@@ -127,6 +131,25 @@ export function App() {
     setLoadError(null);
   }, []);
 
+  // Computed ONCE per config load (controller ruling): the parsed root's
+  // container key decides whether structured edits target v1 `provider.*`
+  // or v2 `providers.*` paths. Saves never migrate the shape, so the memo
+  // deliberately keys on the LOAD (path + nonce), not on our own saves' text.
+  const docShape = useMemo(
+    () => (currentConfig === null ? "v2" : detectDocShape(currentConfig.text)),
+    [currentConfig?.path, loadNonce], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const switchTab = useCallback(
+    (next: TabId) => {
+      if (tab === "providers" && next !== tab && providersDirty) {
+        if (!window.confirm("Discard the unsaved provider changes in the Providers tab?")) return;
+      }
+      setTab(next);
+    },
+    [tab, providersDirty],
+  );
+
   const activeTab = TABS.find((entry) => entry.id === tab);
 
   return (
@@ -152,7 +175,7 @@ export function App() {
             key={entry.id}
             type="button"
             className={`tab${tab === entry.id ? " tab-active" : ""}${entry.placeholder !== null ? " tab-later" : ""}`}
-            onClick={() => setTab(entry.id)}
+            onClick={() => switchTab(entry.id)}
           >
             {entry.label}
           </button>
@@ -171,8 +194,20 @@ export function App() {
           <section className="placeholder">{activeTab.placeholder}</section>
         ) : currentConfig === null ? (
           <section className="placeholder">
-            Select a config file above to edit it as raw JSONC.
+            Select a config file above to edit it.
           </section>
+        ) : tab === "providers" ? (
+          <ProviderList
+            key={currentConfig.path}
+            config={currentConfig}
+            folder={folder}
+            docShape={docShape}
+            loadNonce={loadNonce}
+            onSaved={handleSaved}
+            onReload={reloadCurrentConfig}
+            onToast={addToast}
+            onDirty={setProvidersDirty}
+          />
         ) : (
           <RawJsonTab
             key={currentConfig.path}

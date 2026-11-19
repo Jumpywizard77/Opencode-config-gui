@@ -270,3 +270,307 @@ code {
 .toast-error {
   border-left-color: var(--red);
 }
+
+/* ---- Providers tab ----------------------------------------------------- */
+
+.provider-list-tab {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+}
+
+.legacy-banner {
+  border: 1px solid var(--amber);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--amber);
+  background: rgba(217, 164, 65, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.provider-columns {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex: 1;
+}
+
+.provider-picker {
+  width: 230px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.provider-list-head {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+.provider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.provider-row > button {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-row-active > button {
+  border-color: var(--accent);
+}
+
+.shape-badge {
+  font-size: 11px;
+  color: var(--fg-dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.provider-add {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.provider-add input {
+  flex: 1;
+  min-width: 0;
+}
+
+.provider-detail {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.provider-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.provider-editor,
+.model-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field-label {
+  color: var(--fg-dim);
+  font-size: 12px;
+  display: inline-block;
+  margin-bottom: 2px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px 12px;
+}
+
+.field-grid input,
+.preset-row input {
+  width: 100%;
+}
+
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-free {
+  flex: 1;
+  min-width: 180px;
+}
+
+.bool-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.bool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.api-key-row {
+  display: flex;
+  gap: 4px;
+}
+
+.api-key-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.endpoint-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.endpoint-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.probe-status {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.probe-chip {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  border-radius: 3px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+}
+
+.probe-ok .probe-chip {
+  color: var(--accent);
+}
+
+.probe-unreachable .probe-chip,
+.probe-not_compatible .probe-chip {
+  color: var(--red);
+}
+
+.probe-auth_failed .probe-chip {
+  color: var(--amber);
+}
+
+.probe-latency {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+.probe-detail {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+.probe-models ul {
+  margin: 4px 0;
+  padding-left: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.kv-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kv-row {
+  display: flex;
+  gap: 4px;
+}
+
+.kv-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-card {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  margin: 6px 0;
+  background: var(--bg);
+}
+
+.model-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.model-key-row input {
+  max-width: 260px;
+}
+
+.model-add {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.variant-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.variant-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.variant-id {
+  max-width: 150px;
+}
+
+.settings-cells {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.settings-key {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+.variant-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.variant-convert {
+  font-style: italic;
+}
