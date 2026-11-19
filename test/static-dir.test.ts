@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -13,12 +13,18 @@ afterAll(() => {
 
 // A fake <package>/dist/cli.js location: the ".." anchor resolves to <root>.
 const packageAnchor = pathToFileURL(join(tempRoot, "pkg", "dist", "cli.js")).href;
-// A fake node executable location whose dist/ui actually exists.
-const fakeExecDir = join(tempRoot, "fake-exec");
+// A fake RELEASE LAYOUT: the executable is a FILE, and the archive ships its
+// `dist/ui` as a SIBLING of that file (see .github/workflows/release.yml).
+// Passing the file (not a directory) here is what pins the executable-file →
+// dirname semantics — joining `dist/ui` onto the file path itself was a bug
+// every release binary would have shipped with.
+const fakeExecDir = join(tempRoot, "release", "opencode-config-gui-windows-x64");
+const fakeExecFile = join(fakeExecDir, "opencode-config-gui.exe");
 mkdirSync(join(fakeExecDir, "dist", "ui"), { recursive: true });
+writeFileSync(fakeExecFile, "not a real binary, just a path anchor\n");
 const fakeExecUi = join(fakeExecDir, "dist", "ui");
 
-/** Only the fake executable's dist/ui "exists" in this scenario. */
+/** Only the executable's sibling dist/ui "exists" in this scenario. */
 const onlyExecUi = (path: string): boolean => path === fakeExecUi;
 
 describe("static dir candidate ladder", () => {
@@ -26,7 +32,7 @@ describe("static dir candidate ladder", () => {
     const flagPath = resolve(join(tempRoot, "somewhere", "ui"));
     const candidates = staticDirCandidates(flagPath, {
       importMetaUrl: packageAnchor,
-      execPath: fakeExecDir,
+      execPath: fakeExecFile,
     });
     expect(candidates).toEqual([flagPath]);
   });
@@ -34,15 +40,26 @@ describe("static dir candidate ladder", () => {
   it("package-root candidate comes first, executable-relative second", () => {
     const candidates = staticDirCandidates(undefined, {
       importMetaUrl: packageAnchor,
-      execPath: fakeExecDir,
+      execPath: fakeExecFile,
     });
     expect(candidates).toEqual([join(tempRoot, "pkg", "dist", "ui"), fakeExecUi]);
+  });
+
+  it("the executable-relative candidate is a SIBLING of the executable file, never inside it", () => {
+    // The Bun-compiled binary IS the execPath file; the shipped `dist/ui`
+    // sits next to it. This pins the release-archive layout exactly.
+    const candidates = staticDirCandidates(undefined, {
+      importMetaUrl: "bunfs:///root/index.js",
+      execPath: fakeExecFile,
+    });
+    expect(candidates).toEqual([fakeExecUi]);
+    expect(candidates[0]).not.toContain("opencode-config-gui.exe");
   });
 
   it("a bunfs:/// anchor (Bun compiled binary) contributes NO candidate instead of throwing", () => {
     const candidates = staticDirCandidates(undefined, {
       importMetaUrl: "bunfs:///root/index.js",
-      execPath: fakeExecDir,
+      execPath: fakeExecFile,
     });
     expect(candidates).toEqual([fakeExecUi]);
   });
@@ -51,7 +68,7 @@ describe("static dir candidate ladder", () => {
     expect(
       resolveStaticDir(undefined, {
         importMetaUrl: "bunfs:///root/index.js",
-        execPath: fakeExecDir,
+        execPath: fakeExecFile,
         exists: onlyExecUi,
       }),
     ).toBe(fakeExecUi);
@@ -63,7 +80,7 @@ describe("static dir candidate ladder", () => {
     expect(
       resolveStaticDir(undefined, {
         importMetaUrl: packageAnchor,
-        execPath: fakeExecDir,
+        execPath: fakeExecFile,
         exists: both,
       }),
     ).toBe(join(tempRoot, "pkg", "dist", "ui"));
@@ -73,7 +90,7 @@ describe("static dir candidate ladder", () => {
     expect(
       resolveStaticDir(join(tempRoot, "nope"), {
         importMetaUrl: packageAnchor,
-        execPath: fakeExecDir,
+        execPath: fakeExecFile,
         exists: onlyExecUi,
       }),
     ).toBeUndefined();

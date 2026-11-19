@@ -32,7 +32,11 @@ export type { DiscoveredConfig };
 export interface ConfigApiDeps {
   platform?: NodeJS.Platform;
   env?: Record<string, string | undefined>;
-  /** Server's project folder for discovery (the UI's `?folder=` is per-request). */
+  /**
+   * Server's operator-chosen project folder (cli.ts: `--folder`, default
+   * cwd) for discovery AND an allowed vetting root (same trust class as the
+   * per-request `?folder=`).
+   */
   cwd?: string;
   /** Home dir used as an allowed root for GET/PUT (tests override it). */
   homeDir?: string;
@@ -78,13 +82,15 @@ function withinRoot(rootKey: string, candidateKey: string): boolean {
  * Decide whether a client-supplied path may be read or written:
  *
  * 1. it must be one of THIS request's `discoverConfigs` results (global /
- *    project under cwd or `?folder=`), compared on canonical keys so `..`
- *    tricks cannot slip a different file past a string match;
+ *    project under the server folder or `?folder=`), compared on canonical
+ *    keys so `..` tricks cannot slip a different file past a string match;
  * 2. system/managed kinds are refused (403) by kind, before any read;
  * 3. the canonical path must additionally resolve INSIDE one of the allowed
- *    roots — the user home dir or the request's `?folder=` — as
- *    defense-in-depth against configs discovered via server-side defaults
- *    (e.g. cwd) that the user never opened.
+ *    roots — the user home dir, the request's `?folder=`, or the server's
+ *    own configured project folder (`deps.cwd`) — as defense-in-depth:
+ *    discovery plus roots together can never open a file the user has not
+ *    pointed the tool at (via `--folder`/cwd on the command line or the
+ *    UI's folder picker).
  *
  * Exported for Task 9's `extra-api.ts`, which vets upgrade paths through
  * this exact function (one path-safety implementation, no drift).
@@ -108,6 +114,13 @@ export function vetConfigPath(
 
   const roots = [deps.homeDir ?? homedir()];
   if (folder !== undefined) roots.push(folder);
+  // The OPERATOR-CHOSEN folder (`--folder`, defaulting to cwd — cli.ts
+  // resolves it and threads it in as `deps.cwd`): it is what discovery
+  // listed for the user, chosen on the command line, so it is the same
+  // trust class as a request's `?folder=`. Without it, the flagship
+  // "cd into your project, run the tool, pick the project config" flow
+  // 404s for every project outside $HOME.
+  roots.push(deps.cwd ?? process.cwd());
   const target = canonicalKey(entry.path);
   if (!roots.some((root) => withinRoot(canonicalKey(root), target))) {
     return { ok: false, status: 404, error: "unknown_or_unsafe_path" };

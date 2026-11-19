@@ -47,7 +47,13 @@ const TABS: { id: TabId; label: string; placeholder: string | null }[] = [
 
 export function App() {
   // Server-side state for the ACTIVE probe folder (undefined = server default).
-  const [folder, setFolder] = useState<string | undefined>(undefined);
+  // Seeded from `?folder=` on boot: the CLI opens the page with the operator
+  // folder it resolved from --folder/cwd, so configs discovered through that
+  // folder carry it on every getState/getConfig call from the first render.
+  const [folder, setFolder] = useState<string | undefined>(() => {
+    const seed = new URLSearchParams(window.location.search).get("folder");
+    return seed !== null && seed !== "" ? seed : undefined;
+  });
   const [state, setState] = useState<StatePayload | null>(null);
   const [currentConfig, setCurrentConfig] = useState<CurrentConfig | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

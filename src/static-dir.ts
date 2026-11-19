@@ -2,6 +2,8 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { execDataDir } from "./exec-data-dir.js";
+
 /**
  * Static-UI directory resolution, extracted from `cli.ts` so the candidate
  * ladder is unit-testable (and so importing it has no side effects).
@@ -25,9 +27,10 @@ export interface StaticDirDeps {
  *  - for a Bun-compiled single-file binary (see .github/workflows/release.yml):
  *    the module URL points INSIDE the executable's embedded virtual FS
  *    (`bunfs:///` or `file:///<drive>:\~BUN\...`), so the release archive
- *    instead ships `dist/ui` next to the binary itself. Under plain Node this
- *    candidate is just <node dir>/dist/ui, which does not exist, so it is
- *    inert there.
+ *    instead ships `dist/ui` next to the binary itself — the candidate is the
+ *    shared `execDataDir` (dirname of the executable FILE) plus `dist/ui`.
+ *    Under plain Node this candidate is just <node dir>/dist/ui, which does
+ *    not exist, so it is inert there.
  *
  * The anchor-URL candidate's CONSTRUCTION is guarded, not just its use:
  * `fileURLToPath` THROWS on a `bunfs:///` scheme, and an unguarded throw would
@@ -42,7 +45,7 @@ export function staticDirCandidates(
   if (staticFlag !== undefined) {
     return [resolve(staticFlag)];
   }
-  const candidates: string[] = [join(deps.execPath ?? process.execPath, "dist", "ui")];
+  const candidates: string[] = [join(execDataDir(deps.execPath ?? process.execPath), "dist", "ui")];
   try {
     candidates.unshift(
       join(fileURLToPath(new URL("..", deps.importMetaUrl ?? import.meta.url)), "dist", "ui"),

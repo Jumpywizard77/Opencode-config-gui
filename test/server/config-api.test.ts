@@ -348,34 +348,78 @@ describe("server/config-api", () => {
   });
 
   it("getConfig_forPathOutsideAllowedRoots_shouldReturn404", async () => {
-    // dir2 is scanned through deps.cwd (so the file IS discovered), but the
-    // request's allowed roots are homeDir (an empty dir) + ?folder=dir.
-    const harness = await boot();
-    const dir2 = mkdtempSync(join(tmpdir(), "ocg-srv-other-"));
+    // A discovered config living outside EVERY allowed root: the vetting
+    // homeDir (a never-created dir), the operator folder (deps.cwd = dir2,
+    // chosen via --folder/cwd) and the request's ?folder= (harness.dir).
+    // It is a fake-HOME global, discovered through a fake fs that knows only
+    // that file, so no real home is ever consulted.
+    const outsideGlobal = "/outside-home/.config/opencode/opencode.json";
+    const dir2 = mkdtempSync(join(tmpdir(), "ocg-srv-opdir-"));
     try {
-      const otherConfig = join(dir2, "opencode.json");
-      writeFileSync(otherConfig, FIXTURE_TEXT);
-      const cwdBoot = await boot({ cwd: dir2 });
+      const harness = await boot({
+        cwd: dir2,
+        env: { HOME: "/outside-home" },
+        discoveryFs: discoveryFsFake([outsideGlobal]),
+      });
 
-      const direct = await call(cwdBoot, "GET", `/api/config${query({ path: otherConfig, folder: harness.dir })}`);
+      const direct = await call(
+        harness,
+        "GET",
+        `/api/config${query({ path: outsideGlobal, folder: harness.dir })}`,
+      );
       expect(direct.status).toBe(404);
       expect(direct.body.error).toBe("unknown_or_unsafe_path");
 
       // The same file reached through `..` tricks is refused identically —
       // the escape attempt resolves to the outside path, then fails roots.
-      const trick = join(harness.dir, "..", basename(dir2), "opencode.json");
-      const viaTrick = await call(cwdBoot, "GET", `/api/config${query({ path: trick, folder: harness.dir })}`);
+      // (Enough `..` segments to climb past any temp-dir depth; resolve()
+      // clamps them at the filesystem root.)
+      const trick = join(
+        harness.dir,
+        "..", "..", "..", "..", "..", "..", "..",
+        "outside-home",
+        ".config",
+        "opencode",
+        "opencode.json",
+      );
+      const viaTrick = await call(harness, "GET", `/api/config${query({ path: trick, folder: harness.dir })}`);
       expect(viaTrick.status).toBe(404);
       expect(viaTrick.body.error).toBe("unknown_or_unsafe_path");
-
-      // Control: a `..` hop that resolves back INSIDE the allowed root works.
-      const harmless = join(harness.dir, "sub", "..", "opencode.json");
-      const ok = await call(cwdBoot, "GET", `/api/config${query({ path: harmless, folder: harness.dir })}`);
-      expect(ok.status).toBe(200);
-      expect(ok.body.text).toBe(FIXTURE_TEXT);
     } finally {
       try {
         rmSync(dir2, { recursive: true, force: true });
+      } catch {
+        // temp dir, disposable
+      }
+    }
+  });
+
+  it("getConfig_discoveredViaOperatorFolder_withoutFolderParam_shouldReturn200", async () => {
+    // The flagship flow: `cd <project> && opencode-config-gui` (or
+    // --folder). The project config is discovered through the SERVER's
+    // operator folder (deps.cwd) and requested with NO ?folder= at all —
+    // the operator chose that folder on the command line, so it is an
+    // allowed vetting root (this used to 404 for every project outside
+    // $HOME, i.e. most real ones).
+    const operatorDir = mkdtempSync(join(tmpdir(), "ocg-srv-opdir-"));
+    try {
+      const operatorConfig = join(operatorDir, "opencode.json");
+      copyFileSync(FIXTURE_PATH, operatorConfig);
+      const harness = await boot({ cwd: operatorDir });
+
+      const got = await call(harness, "GET", `/api/config${query({ path: operatorConfig })}`);
+      expect(got.status).toBe(200);
+      expect(got.body.text).toBe(FIXTURE_TEXT);
+
+      // Control: a `..` hop that resolves back INSIDE the operator root
+      // works — the root check runs on canonical paths, not strings.
+      const trick = join(operatorDir, "sub", "..", "opencode.json");
+      const viaTrick = await call(harness, "GET", `/api/config${query({ path: trick })}`);
+      expect(viaTrick.status).toBe(200);
+      expect(viaTrick.body.text).toBe(FIXTURE_TEXT);
+    } finally {
+      try {
+        rmSync(operatorDir, { recursive: true, force: true });
       } catch {
         // temp dir, disposable
       }

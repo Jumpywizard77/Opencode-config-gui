@@ -127,7 +127,11 @@ function main(): void {
   // lets the OS pick, which is why the URL is printed from the bound address.
   server.listen(port, "127.0.0.1", () => {
     const address = server.address() as AddressInfo;
-    const url = `http://127.0.0.1:${address.port}`;
+    // Seed the UI with the operator folder: it is what discovery used, and
+    // the server vets config paths against it — carrying it as `?folder=`
+    // makes the picker's project configs openable without a manual "Open
+    // folder…" (App reads it on boot).
+    const url = `http://127.0.0.1:${address.port}/?folder=${encodeURIComponent(folder)}`;
     console.log(`opencode-config-gui running at ${url}`);
     if (staticDir === undefined) {
       console.log("(no built UI found; the API is served but there is no page to open)");

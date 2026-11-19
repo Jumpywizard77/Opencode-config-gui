@@ -1,10 +1,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import type { ErrorObject, ValidateFunction } from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
 
+import { execDataDir } from "../exec-data-dir.js";
 import { parseJsonc } from "./jsonc.js";
 import type { Issue } from "./types.js";
 
@@ -42,13 +43,15 @@ const BUNDLED_SCHEMA_URL = new URL("./schema-bundled.json", import.meta.url);
  * Vendored-copy paths to try, in order. The second candidate serves the
  * Bun-compiled single-file binary (release archives): there `import.meta.url`
  * lives inside the executable's embedded virtual FS, so the archive ships
- * `dist/core/schema-bundled.json` next to the binary. Under plain Node the
- * candidate is <node dir>/dist/core/schema-bundled.json, which does not
- * exist, so it is inert there.
+ * `dist/core/schema-bundled.json` next to the binary — via the shared
+ * `execDataDir` ladder (see `exec-data-dir.ts`) the static UI candidate is
+ * derived the same way, so the two rungs can never disagree. Under plain
+ * Node the candidate is <node dir>/dist/core/schema-bundled.json, which does
+ * not exist, so it is inert there.
  */
 const BUNDLED_CANDIDATES: (string | URL)[] = [
   BUNDLED_SCHEMA_URL,
-  join(dirname(process.execPath), "dist", "core", "schema-bundled.json"),
+  join(execDataDir(), "dist", "core", "schema-bundled.json"),
 ];
 
 /**
