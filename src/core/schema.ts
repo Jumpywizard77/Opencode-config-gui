@@ -1,0 +1,200 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+import type { ErrorObject, ValidateFunction } from "ajv";
+import Ajv2020 from "ajv/dist/2020.js";
+
+import { parseJsonc } from "./jsonc";
+import type { Issue } from "./types";
+
+/** Where the live schema is published; also the `$id` of the vendored copy. */
+export const REMOTE_SCHEMA_URL = "https://opencode.ai/config.json";
+
+/** A usable schema plus provenance: `fetchedAt` is `"bundled"` for the vendored copy. */
+export interface SchemaSource {
+  schema: object;
+  source: "bundled" | "remote";
+  fetchedAt: string;
+}
+
+export interface LoadSchemaOptions {
+  /** Force a network refresh; without it a valid disk cache is served as-is. */
+  refresh?: boolean;
+  /** Injectable fetch for tests; defaults to the global (Node >= 20). */
+  fetchImpl?: typeof fetch;
+  /** Override the cache directory (tests). */
+  cacheDir?: string;
+}
+
+const CACHE_FILE_NAME = "config-schema.json";
+
+function cacheFilePath(opts: LoadSchemaOptions): string {
+  const dir = opts.cacheDir ?? join(homedir(), ".cache", "opencode-config-gui");
+  return join(dir, CACHE_FILE_NAME);
+}
+
+function readBundledSchema(): object {
+  return JSON.parse(
+    readFileSync(new URL("./schema-bundled.json", import.meta.url), "utf8"),
+  ) as object;
+}
+
+/** A malformed or partial cache file counts as a miss, never as an error. */
+function readCache(path: string): SchemaSource | undefined {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    if (
+      parsed !== null &&
+      typeof parsed === "object" &&
+      typeof (parsed as { fetchedAt?: unknown }).fetchedAt === "string" &&
+      typeof (parsed as { schema?: unknown }).schema === "object" &&
+      (parsed as { schema?: unknown }).schema !== null
+    ) {
+      const { schema, fetchedAt } = parsed as { schema: object; fetchedAt: string };
+      return { schema, source: "remote", fetchedAt };
+    }
+  } catch {
+    // fall through to a cache miss
+  }
+  return undefined;
+}
+
+function writeCache(path: string, source: SchemaSource): void {
+  try {
+    mkdirSync(join(path, ".."), { recursive: true });
+    writeFileSync(path, JSON.stringify({ fetchedAt: source.fetchedAt, schema: source.schema }));
+  } catch {
+    // Caching is best-effort; an unwritable cache never fails a refresh.
+  }
+}
+
+/**
+ * Fetch the live opencode config schema with a disk cache and a vendored
+ * fallback. The ladder is refresh→cache→bundled and the function never
+ * throws: any network, HTTP, parse or write failure just walks down it.
+ */
+export async function loadSchema(opts: LoadSchemaOptions = {}): Promise<SchemaSource> {
+  const cachePath = cacheFilePath(opts);
+
+  if (!opts.refresh) {
+    const cached = readCache(cachePath);
+    if (cached) return cached;
+  }
+
+  const doFetch = opts.fetchImpl ?? fetch;
+  try {
+    const response = await doFetch(REMOTE_SCHEMA_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} from ${REMOTE_SCHEMA_URL}`);
+    }
+    const schema = (await response.json()) as unknown;
+    if (typeof schema !== "object" || schema === null) {
+      throw new Error(`${REMOTE_SCHEMA_URL} returned a non-object body`);
+    }
+    const source: SchemaSource = { schema, source: "remote", fetchedAt: new Date().toISOString() };
+    writeCache(cachePath, source);
+    return source;
+  } catch {
+    // refresh failed: serve the cache, else the vendored copy
+  }
+
+  return readCache(cachePath) ?? { schema: readBundledSchema(), source: "bundled", fetchedAt: "bundled" };
+}
+
+/** Absolute-URI `$ref` (anything with a `scheme://` prefix); `#/$defs/...` is local. */
+const REMOTE_REF = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+/**
+ * Deep-copy the schema dropping every remote `$ref` keyword (today only
+ * `https://models.dev/model-schema.json#/$defs/Model`). Under draft 2020-12 a
+ * `$ref` conjoins with its siblings, so deleting the keyword is exactly
+ * stubbing the referenced schema with permissive `{}` while keeping local
+ * `#/$defs/...` refs and sibling keywords intact — ajv then compiles offline.
+ */
+function stubRemoteRefs(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(stubRemoteRefs);
+  if (typeof node === "object" && node !== null) {
+    const copy: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "$ref" && typeof value === "string" && REMOTE_REF.test(value)) continue;
+      copy[key] = stubRemoteRefs(value);
+    }
+    return copy;
+  }
+  return node;
+}
+
+// One compiled validator per schema generation. `fetchedAt` is unique per
+// refresh ("bundled" for the vendored copy), so the map stays small.
+const validators = new Map<string, ValidateFunction>();
+
+function getValidator(source: SchemaSource): ValidateFunction {
+  let validate = validators.get(source.fetchedAt);
+  if (!validate) {
+    // `strict: false` is what makes `deprecated: true` (and every other
+    // annotation ajv would warn about) invisible: deprecation is never a
+    // validation error — warnings belong to the raw tab, not Issues.
+    const ajv = new Ajv2020({ strict: false, allErrors: true, verbose: false });
+    validate = ajv.compile(stubRemoteRefs(source.schema) as object);
+    validators.set(source.fetchedAt, validate);
+  }
+  return validate;
+}
+
+function instancePathSegments(instancePath: string): (string | number)[] {
+  return instancePath
+    .split("/")
+    .slice(1)
+    .map((segment) => {
+      const unescaped = segment.replace(/~1/g, "/").replace(/~0/g, "~");
+      return /^\d+$/.test(unescaped) ? Number(unescaped) : unescaped;
+    });
+}
+
+/** Same dot/bracket style as core/jsonc's parse-issue paths. */
+function formatPath(segments: (string | number)[]): string {
+  let out = "";
+  for (const segment of segments) {
+    if (typeof segment === "number") {
+      out += `[${segment}]`;
+    } else {
+      out += out === "" ? segment : `.${segment}`;
+    }
+  }
+  return out;
+}
+
+function toIssue(error: ErrorObject): Issue {
+  const segments = instancePathSegments(error.instancePath);
+  let message = error.message ?? `validation failed (${error.keyword})`;
+  if (error.keyword === "additionalProperties") {
+    const extra = (error.params as { additionalProperty?: unknown }).additionalProperty;
+    if (typeof extra === "string") {
+      segments.push(extra);
+      message = `${message}: "${extra}"`;
+    }
+  }
+  return { path: formatPath(segments), message };
+}
+
+/**
+ * Validate a config document's text against a loaded schema: parse first
+ * (parse errors short-circuit to Issues), then ajv. Errors become `Issue`s
+ * with dot-paths (`providers.Maya.settings`; array steps as `a[0].b`), and
+ * for `additionalProperties` the offending key is appended to the path. A
+ * schema that cannot be compiled or run degrades to a single Issue instead
+ * of throwing — a user config must never crash the app through validation.
+ */
+export function validateConfigText(text: string, schema: SchemaSource): Issue[] {
+  const { value, errors } = parseJsonc(text);
+  if (errors.length > 0) return errors;
+
+  try {
+    const validate = getValidator(schema);
+    if (validate(value)) return [];
+    return (validate.errors ?? []).map(toIssue);
+  } catch (cause) {
+    return [{ path: "", message: `schema validation unavailable: ${String(cause)}` }];
+  }
+}
