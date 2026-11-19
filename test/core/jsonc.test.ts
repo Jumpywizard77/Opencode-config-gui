@@ -120,6 +120,26 @@ describe("core/jsonc", () => {
     });
   });
 
+  it("applyPathEdits_withMalformedDocument_shouldThrowWithParseIssuesAndNotReturnMangledText", () => {
+    const malformed = "this is not json at all";
+
+    let error: unknown;
+    try {
+      applyPathEdits(malformed, [{ path: ["provider"], value: { x: 1 } }]);
+    } catch (thrown) {
+      error = thrown;
+    }
+
+    expect(error).toBeInstanceOf(Error);
+    const message = (error as Error).message;
+    expect(message.length).toBeGreaterThan(0);
+    expect(message).toContain("applyPathEdits");
+    // Names at least one issue as line:col message (first InvalidSymbol is at 1:1).
+    expect(message).toMatch(/\b1:1 \w/);
+    // Diagnostics only — the document body must not be echoed back.
+    expect(message).not.toContain(malformed);
+  });
+
   it("parseJsonc_withTrailingComma_returnsValueAndNoHardErrors", () => {
     const { value, errors } = parseJsonc(`{
   "list": [1, 2, 3,],
