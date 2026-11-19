@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { ErrorObject, ValidateFunction } from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -39,6 +39,19 @@ function cacheFilePath(opts: LoadSchemaOptions): string {
 const BUNDLED_SCHEMA_URL = new URL("./schema-bundled.json", import.meta.url);
 
 /**
+ * Vendored-copy paths to try, in order. The second candidate serves the
+ * Bun-compiled single-file binary (release archives): there `import.meta.url`
+ * lives inside the executable's embedded virtual FS, so the archive ships
+ * `dist/core/schema-bundled.json` next to the binary. Under plain Node the
+ * candidate is <node dir>/dist/core/schema-bundled.json, which does not
+ * exist, so it is inert there.
+ */
+const BUNDLED_CANDIDATES: (string | URL)[] = [
+  BUNDLED_SCHEMA_URL,
+  join(dirname(process.execPath), "dist", "core", "schema-bundled.json"),
+];
+
+/**
  * The last rung of the never-throw ladder. A vendored copy that is absent,
  * unparseable or a non-object (e.g. `dist/` packaging that forgot the JSON)
  * degrades to a permissive `{}` schema — which makes `validateConfigText`
@@ -49,13 +62,15 @@ const BUNDLED_SCHEMA_URL = new URL("./schema-bundled.json", import.meta.url);
  * with the real vendored schema's.
  */
 function bundledFallback(bundledPath?: string | URL): SchemaSource {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(bundledPath ?? BUNDLED_SCHEMA_URL, "utf8"));
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-      return { schema: parsed, source: "bundled", fetchedAt: "bundled" };
+  for (const candidate of bundledPath !== undefined ? [bundledPath] : BUNDLED_CANDIDATES) {
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(candidate, "utf8"));
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        return { schema: parsed, source: "bundled", fetchedAt: "bundled" };
+      }
+    } catch {
+      // try the next candidate
     }
-  } catch {
-    // degrade below
   }
   return { schema: {}, source: "bundled", fetchedAt: "bundled-missing" };
 }

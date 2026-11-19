@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # Six single-file binaries via `bun build --compile src/cli.ts`, cross-
+  # compiled from one Linux host (Bun supports all six --targets from Linux;
+  # Bun names arm64 "aarch64"; windows binaries get a .exe suffix).
+  #
+  # Bun-compiled binaries resolve `import.meta.url` inside the executable's
+  # embedded virtual FS, so the archive layout ships the runtime data next to
+  # the binary itself:
+  #
+  #   opencode-config-gui-<os>-<arch>/
+  #     opencode-config-gui[.exe]
+  #     dist/core/schema-bundled.json   # src/core/schema.ts falls back to
+  #     dist/ui/                        # <exe dir>/dist/... (see its comments)
+  #
+  # The vendored schema is additionally embedded by Bun's asset handling of
+  # `new URL("./schema-bundled.json", import.meta.url)`; the shipped copy is
+  # the safety net either way. Not compiled locally (no Bun here): correctness
+  # is by construction, validated by the CI smoke job against the same build.
+  binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build dist (UI assets + vendored schema)
+        run: npm run build
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Compile six binaries and archive each
+        env:
+          TARGETS: >-
+            bun-windows-x64:windows-x64
+            bun-windows-aarch64:windows-arm64
+            bun-linux-x64:linux-x64
+            bun-linux-aarch64:linux-arm64
+            bun-darwin-x64:darwin-x64
+            bun-darwin-aarch64:darwin-arm64
+        run: |
+          set -euo pipefail
+          for entry in $TARGETS; do
+            target="${entry%%:*}"
+            name="${entry##*:}"
+            out="release/opencode-config-gui-$name"
+            rm -rf "$out"
+            mkdir -p "$out/dist/core"
+            bin="$out/opencode-config-gui"
+            case "$name" in windows-*) bin="$bin.exe" ;; esac
+            bun build --compile --target="$target" src/cli.ts --outfile "$bin"
+            cp -r dist/ui "$out/dist/ui"
+            cp dist/core/schema-bundled.json "$out/dist/core/schema-bundled.json"
+            chmod +x "$bin"
+            (cd release && zip -qr "../opencode-config-gui-$name.zip" "opencode-config-gui-$name")
+          done
+          ls -l release ../*.zip
+      - name: Attach to the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: opencode-config-gui-*.zip

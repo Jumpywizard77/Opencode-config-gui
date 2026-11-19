@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import type { AddressInfo } from "node:net";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createConfigApiHandlers } from "./server/config-api.js";
@@ -76,12 +76,21 @@ function parseArgs(argv: string[]): { options?: CliOptions; error?: string; help
     }
   }
 
-  // dist/cli.js sits in <package>/dist, so the package root is one up.
-  const packageRoot = fileURLToPath(new URL("..", import.meta.url));
-  let staticDir: string | undefined = resolve(staticFlag ?? join(packageRoot, "dist", "ui"));
-  if (!existsSync(staticDir)) {
-    staticDir = undefined; // no UI built (yet): static serving stays off
-  }
+  // Candidate package roots, first match wins:
+  //  - `--static` (verbatim);
+  //  - for `node dist/cli.js` / the npm bin: dist/cli.js sits in <package>/dist,
+  //    so the package root is one up from import.meta.url;
+  //  - for a Bun-compiled single-file binary (see .github/workflows/release.yml):
+  //    import.meta.url points INSIDE the executable's embedded virtual FS, so
+  //    the release archive instead ships `dist/ui` next to the binary itself.
+  //    Under plain Node this candidate is just <node dir>/dist/ui, which does
+  //    not exist, so it is inert there.
+  const staticCandidates =
+    staticFlag !== undefined
+      ? [resolve(staticFlag)]
+      : [join(fileURLToPath(new URL("..", import.meta.url)), "dist", "ui"), join(dirname(process.execPath), "dist", "ui")];
+  const staticDir = staticCandidates.find((candidate) => existsSync(candidate));
+  // undefined when nothing exists to serve: static serving stays off
   return { options: { port, folder: resolve(folder ?? process.cwd()), open, staticDir } };
 }
 

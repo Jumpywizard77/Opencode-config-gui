@@ -6,14 +6,21 @@
   "bin": {
     "opencode-config-gui": "dist/cli.js"
   },
-  "//": "src/cli.ts starts with '#!/usr/bin/env node' and tsc preserves shebangs, so dist/cli.js is directly executable for the bin entry; the build must not prepend or strip it.",
+  "//": "src/cli.ts starts with '#!/usr/bin/env node'; tsc preserves it and scripts/postbuild.mjs re-asserts it plus the exec bit. engines is the RUNTIME floor for `npx opencode-config-gui` (Node 20: global fetch, AbortSignal.timeout, node:http — nothing newer is used in shipped code). The DEV toolchain (vitest) needs Node >= 22.12; see README.",
   "engines": {
     "node": ">=20"
   },
+  "files": [
+    "dist",
+    "src/core/schema-bundled.json",
+    "README.md"
+  ],
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json && node -e \"const fs=require('fs');fs.mkdirSync('dist/core',{recursive:true});fs.copyFileSync('src/core/schema-bundled.json','dist/core/schema-bundled.json')\" && vite build",
+    "build": "tsc -p tsconfig.build.json && vite build && node scripts/postbuild.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "dev:ui": "vite",
     "dev:server": "node --watch dist/cli.js --port 8710 --no-open"
   },
