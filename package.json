@@ -12,7 +12,6 @@
   },
   "files": [
     "dist",
-    "src/core/schema-bundled.json",
     "README.md"
   ],
   "scripts": {

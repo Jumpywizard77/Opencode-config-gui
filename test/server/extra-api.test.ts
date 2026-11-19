@@ -150,9 +150,18 @@ function rawGet(
   pathWithQuery: string,
   headers: Record<string, string> = {},
 ): Promise<{ status: number; body: string }> {
+  return rawRequest(harness, "GET", pathWithQuery, headers);
+}
+
+function rawRequest(
+  harness: Harness,
+  method: string,
+  pathWithQuery: string,
+  headers: Record<string, string> = {},
+): Promise<{ status: number; body: string }> {
   return new Promise((done, fail) => {
     const { port } = harness.server.address() as AddressInfo;
-    const request = http.request({ host: "127.0.0.1", port, path: pathWithQuery, headers }, (res) => {
+    const request = http.request({ host: "127.0.0.1", port, path: pathWithQuery, method, headers }, (res) => {
       let data = "";
       res.setEncoding("utf8");
       res.on("data", (chunk) => {
@@ -394,6 +403,18 @@ describe("server/extra-api", () => {
       const normalized = await rawGet(harness, "/%2e%2e/opencode.json");
       expect(normalized.status).toBe(200);
       expect(normalized.body).toBe("<!doctype html><title>ocg</title>");
+
+      // The loopback gate covers the static branch too: a DNS-rebinding
+      // shape (connection local, Host foreign) must not fetch the SPA.
+      const forged = await rawGet(harness, "/", { host: "attacker.example" });
+      expect(forged.status).toBe(403);
+      expect(JSON.parse(forged.body).error).toBeTruthy();
+
+      // Static serving is a read surface: only GET/HEAD are answered.
+      const posted = await rawRequest(harness, "POST", "/");
+      expect(posted.status).toBe(405);
+      const head = await rawRequest(harness, "HEAD", "/");
+      expect(head.status).toBe(200);
 
       // Static responses carry no CORS headers either.
       const res = await fetch(`${harness.base}/index.html`);

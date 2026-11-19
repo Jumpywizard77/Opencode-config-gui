@@ -12,6 +12,8 @@ interface RawJsonTabProps {
   onSaved: (path: string, text: string, sha256: string, backupPath: string) => void;
   onReload: () => void;
   onToast: (message: string, kind?: ToastKind) => void;
+  /** Reports unsaved textarea text so App can confirm on tab/config/folder switch. */
+  onDirty: (dirty: boolean) => void;
 }
 
 /**
@@ -29,6 +31,7 @@ export function RawJsonTab({
   onSaved,
   onReload,
   onToast,
+  onDirty,
 }: RawJsonTabProps) {
   const [text, setText] = useState(config.text);
   const [saving, setSaving] = useState(false);
@@ -48,6 +51,15 @@ export function RawJsonTab({
     // config.text is read fresh from the render the nonce bumped in; the
     // nonce is the only intended trigger.
   }, [loadNonce]);
+
+  // Draft = the textarea differs from the last text seeded from disk (or
+  // confirmed by a save). Reported up to App on every change (same contract
+  // as the structured tabs): this draft dies on a tab/config/folder switch,
+  // so App confirms those first.
+  const dirty = text !== config.text;
+  useEffect(() => {
+    onDirty(dirty);
+  }, [dirty, onDirty]);
 
   const handleOutcome = (outcome: SaveOutcome): void => {
     switch (outcome.kind) {
@@ -97,8 +109,6 @@ export function RawJsonTab({
       setSaving(false);
     }
   };
-
-  const dirty = text !== config.text;
 
   return (
     <section className="raw-tab">

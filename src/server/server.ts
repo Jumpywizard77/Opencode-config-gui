@@ -6,10 +6,13 @@ import { extname, join, resolve, sep } from "node:path";
 import { json, requireLocalRequest, type ApiRoutes, type RequestContext } from "./http.js";
 
 /**
- * The whole HTTP shell: binds loopback, gates every `/api/*` request through
- * `requireLocalRequest`, dispatches via the route table, and (optionally)
- * serves the built UI with an SPA fallback. All config logic lives in
- * `config-api.ts`; this file is pure glue.
+ * The whole HTTP shell: binds loopback, gates EVERY request through
+ * `requireLocalRequest` (the static UI is same-origin surface too: an
+ * attacker-driven Host must not fetch it, e.g. to attack the SPA's own
+ * localStorage or probe the port), dispatches API calls via the route
+ * table, and (optionally) serves the built UI for GET/HEAD with an SPA
+ * fallback. All config logic lives in `config-api.ts`; this file is pure
+ * glue.
  */
 
 export interface CreateServerOptions {
@@ -25,13 +28,19 @@ export function createServer(routes: ApiRoutes, options: CreateServerOptions = {
     try {
       // The dummy base is irrelevant: only req.url's path/query are used.
       const url = new URL(req.url ?? "/", "http://127.0.0.1");
-      if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+      const isApi = url.pathname === "/api" || url.pathname.startsWith("/api/");
+      const isStatic = !isApi && options.staticDir !== undefined;
+      if (isApi || isStatic) {
+        // One gate for both surfaces: `/api/*` (config IO) and the static
+        // SPA must never answer a forged Host or a foreign Origin.
         const address = server.address();
         const port = address !== null && typeof address === "object" ? address.port : undefined;
         if (!requireLocalRequest(req, port)) {
           json(res, 403, { error: "not_allowed" });
           return;
         }
+      }
+      if (isApi) {
         const handler = routes[`${req.method ?? "GET"} ${url.pathname}`];
         if (handler === undefined) {
           json(res, 404, { error: "unknown_route" });
@@ -42,6 +51,12 @@ export function createServer(routes: ApiRoutes, options: CreateServerOptions = {
         return;
       }
       if (options.staticDir !== undefined) {
+        // Asset serving is a read surface: GET/HEAD only (HEAD bodies are
+        // suppressed by node:http itself).
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          json(res, 405, { error: "method_not_allowed" });
+          return;
+        }
         serveStatic(options.staticDir, url.pathname, res);
         return;
       }

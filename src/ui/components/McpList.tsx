@@ -310,7 +310,7 @@ export function McpList({
         </div>
       </div>
 
-      <TimeoutTrio form={timeoutForm} mcpBlock={mcpBlock} apply={apply} />
+      <TimeoutTrio form={timeoutForm} mcpBlock={mcpBlock} apply={apply} onUpgrade={onUpgrade} />
 
       <div className="raw-actions">
         <button type="button" onClick={() => void save()} disabled={saving || !dirty || derived === null}>
@@ -352,10 +352,13 @@ function TimeoutTrio({
   form,
   mcpBlock,
   apply,
+  onUpgrade,
 }: {
   form: "absent" | "numeric" | "object";
   mcpBlock: JsonValue | undefined;
   apply: (edits: PathEdit[]) => void;
+  /** App-owned Upgrade dialog opener (same wiring as the legacy banner). */
+  onUpgrade: () => void;
 }) {
   const timeout = isObj(mcpBlock) ? mcpBlock["timeout"] : undefined;
   const values = isObj(timeout) ? timeout : {};
@@ -366,7 +369,11 @@ function TimeoutTrio({
         <div className="warning-banner">
           deprecated numeric form (<code>{JSON.stringify(timeout)}</code>) — the Upgrade dialog
           converts it to <code>{"{ execution }"}</code>; the trio is disabled so no silent reshape
-          happens here. Edit in Raw JSON to change it now.
+          happens here.{" "}
+          <button type="button" onClick={onUpgrade}>
+            Upgrade
+          </button>{" "}
+          or edit in Raw JSON to change it now.
         </div>
       </div>
     );

@@ -58,8 +58,8 @@ Requires Node.js 20 or newer at runtime.
   (`openai-compatible`, `openai`, `anthropic`, `google`, `google-vertex`)
   plus the local-runtime trio (**ollama**, **lmstudio**, **vllm**), which
   need no package and no hosted key. API keys are stored the way OpenCode
-  expects: a literal in your file, or a `env:VAR` / `file:...` reference if
-  you prefer to keep the secret out of the file itself.
+  expects: a literal in your file, or a `{env:NAME}` / `{file:PATH}`
+  reference if you prefer to keep the secret out of the file itself.
 - **Models & variants** — per-model options, limit placeholders and variant
   lists, spelled correctly for your document's shape.
 - **MCP servers** — local and remote MCP entries, env blocks and enabled flags.
@@ -79,9 +79,11 @@ Requires Node.js 20 or newer at runtime.
 ## Security posture
 
 - The server binds `127.0.0.1` only — never a public interface.
-- Every `/api/*` request must carry a local `Host` (and a matching `Origin`
-  when present); foreign hosts and cross-site origins get a hard 403, which
-  is what blocks DNS-rebinding and drive-by requests. No CORS headers, ever.
+- Every request — the `/api/*` routes and the built UI it serves alike —
+  must carry a local `Host` (and a matching `Origin` when present); foreign
+  hosts and cross-site origins get a hard 403, which is what blocks
+  DNS-rebinding and drive-by requests. Static assets answer GET/HEAD only.
+  No CORS headers, ever.
 - No analytics, no telemetry, no update pings. The only outbound requests
   are the ones you trigger: the schema refresh from opencode.ai and endpoint
   probes you press.

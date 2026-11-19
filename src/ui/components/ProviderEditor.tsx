@@ -315,7 +315,12 @@ function EnvRows({
           />
           <button
             type="button"
-            onClick={() => apply([{ path: [...path, "env"], value: rows.filter((_, i) => i !== index) }])}
+            onClick={() => {
+              const remaining = rows.filter((_, i) => i !== index);
+              // Clearing the LAST row deletes the `env` key itself instead
+              // of writing `env: []` debris (the timeoutTrioEdits rule).
+              apply([{ path: [...path, "env"], value: remaining.length === 0 ? undefined : remaining }]);
+            }}
           >
             ✕
           </button>
@@ -324,9 +329,10 @@ function EnvRows({
       {/*
        * "+ env var" persists an empty string AT THE NEXT INDEX (the
        * SettingsCells "+ key" pattern): the row renders from the doc and is
-       * editable. An unfilled "" entry is a legal string element; deleting a
-       * row rewrites the array, so no empty rows are ever written as debris
-       * by removal.
+       * editable. An unfilled "" entry is a legal string element; deleting
+       * a row rewrites the array (and the LAST row's removal deletes the
+       * `env` key outright), so no empty rows or `[]` debris are ever
+       * written by removal.
        */}
       <button type="button" onClick={() => apply([{ path: [...path, "env", rows.length], value: "" }])}>
         + env var

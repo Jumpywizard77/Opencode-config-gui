@@ -22,10 +22,11 @@ interface UpgradeDialogProps {
   /** Server-detected OpenCode version for the standing "recent OpenCode" note. */
   opencodeVersion: string | null;
   /**
-   * Whether the Providers/MCP tabs currently hold unsaved edits. Apply
-   * reloads the config afterwards, which discards them — the Apply click
-   * must confirm first. Read at CLICK time from the latest render (App
-   * re-renders this dialog whenever the flags change, so no stale closure).
+   * Whether the currently visible editor holds unsaved changes (structured
+   * Providers/MCP tabs or the Raw JSON textarea). Apply reloads the config
+   * afterwards, which discards them — the Apply click must confirm first.
+   * Read at CLICK time from the latest render (App re-renders this dialog
+   * whenever the flags change, so no stale closure).
    */
   hasPendingEdits: boolean;
   onToast: (message: string, kind?: ToastKind) => void;
@@ -181,13 +182,14 @@ export function UpgradeDialog({
             type="button"
             onClick={() => {
               // A successful apply RELOADS the config, which discards any
-              // unsaved structured-tab edits — require an explicit confirm.
+              // unsaved editor draft — structured-tab edits AND the Raw
+              // JSON textarea — so require an explicit confirm.
               // `hasPendingEdits` is read from the latest render here, so it
               // is always the CURRENT value at click time.
               if (
                 hasPendingEdits &&
                 !window.confirm(
-                  "The upgrade reloads the config and DISCARDS your unsaved Providers/MCP editor changes. Apply anyway?",
+                  "The upgrade reloads the config and DISCARDS your unsaved Providers/MCP/Raw JSON editor changes. Apply anyway?",
                 )
               ) {
                 return;

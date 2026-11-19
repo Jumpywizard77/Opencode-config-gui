@@ -65,9 +65,11 @@ export function App() {
   const [loadNonce, setLoadNonce] = useState(0);
   // Unsaved structured edits live in each structured tab's state; a tab
   // switch (remount) discards them, so App confirms first while these are
-  // true (keyed to the tab currently on screen).
+  // true (keyed to the tab currently on screen). The Raw JSON textarea's
+  // draft follows the same rule — it dies on tab/config/folder switch too.
   const [providersDirty, setProvidersDirty] = useState(false);
   const [mcpDirty, setMcpDirty] = useState(false);
+  const [rawDirty, setRawDirty] = useState(false);
   // The v1→v2 Upgrade dialog is App-owned: both legacy banners (Providers and
   // MCP) open the SAME one, and Apply → config reload flows through App.
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -138,13 +140,39 @@ export function App() {
     [addToast],
   );
 
-  const handleOpenFolder = useCallback((nextFolder: string) => {
-    loadSeq.current += 1; // a config load for the OLD folder may no longer apply
-    setFolder(nextFolder);
-    setCurrentConfig(null);
-    setLoadError(null);
-    setUpgradeOpen(false); // the dialog targets the closed config
-  }, []);
+  // Label of the tab whose unsaved draft would be destroyed by switching
+  // away, or null. Only the CURRENTLY VISIBLE tab can meaningfully be dirty:
+  // the other flags are stale remnants of already-discarded drafts, and each
+  // tab re-reports its true state on remount (all three report via onDirty).
+  const dirtyLabel =
+    currentConfig === null
+      ? null
+      : tab === "providers" && providersDirty
+        ? "Providers"
+        : tab === "mcp" && mcpDirty
+          ? "MCP"
+          : tab === "raw" && rawDirty
+            ? "Raw JSON"
+            : null;
+
+  // One confirm sentence for every flow that drops the current tab's draft:
+  // tab switch, config switch, folder switch (the Upgrade dialog's Apply
+  // confirm phrases its own, naming the reload).
+  const confirmDiscardDraft = (action: string): boolean =>
+    dirtyLabel === null || window.confirm(`Discard the unsaved ${dirtyLabel} changes and ${action}?`);
+
+  const handleOpenFolder = useCallback(
+    (nextFolder: string) => {
+      if (!confirmDiscardDraft(`switch to folder ${nextFolder}`)) return;
+      loadSeq.current += 1; // a config load for the OLD folder may no longer apply
+      setFolder(nextFolder);
+      setCurrentConfig(null);
+      setLoadError(null);
+      setUpgradeOpen(false); // the dialog targets the closed config
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dirtyLabel],
+  );
 
   // Computed ONCE per config load (controller ruling): the parsed root's
   // container key decides whether structured edits target v1 `provider.*`
@@ -157,18 +185,12 @@ export function App() {
 
   const switchTab = useCallback(
     (next: TabId) => {
-      const dirtyLabel =
-        tab === "providers" && providersDirty
-          ? "Providers"
-          : tab === "mcp" && mcpDirty
-            ? "MCP"
-            : null;
       if (next !== tab && dirtyLabel !== null) {
-        if (!window.confirm(`Discard the unsaved ${dirtyLabel} changes in the ${dirtyLabel} tab?`)) return;
+        if (!window.confirm(`Discard the unsaved ${dirtyLabel} changes?`)) return;
       }
       setTab(next);
     },
-    [tab, providersDirty, mcpDirty],
+    [tab, dirtyLabel],
   );
 
   const activeTab = TABS.find((entry) => entry.id === tab);
@@ -180,7 +202,10 @@ export function App() {
         <ConfigPicker
           configs={state?.configs ?? []}
           selectedPath={currentConfig?.path ?? ""}
-          onSelect={(path) => void selectConfig(path)}
+          onSelect={(path) => {
+            if (!confirmDiscardDraft("open a different config")) return;
+            void selectConfig(path);
+          }}
           onOpenFolder={handleOpenFolder}
         />
         <SchemaBadge state={state} onToast={addToast} />
@@ -248,6 +273,7 @@ export function App() {
             onSaved={handleSaved}
             onReload={reloadCurrentConfig}
             onToast={addToast}
+            onDirty={setRawDirty}
           />
         )}
       </main>
@@ -257,7 +283,7 @@ export function App() {
           config={currentConfig}
           folder={folder}
           opencodeVersion={state?.opencodeVersion ?? null}
-          hasPendingEdits={providersDirty || mcpDirty}
+          hasPendingEdits={dirtyLabel !== null}
           onToast={addToast}
           onReload={reloadCurrentConfig}
           onClose={() => setUpgradeOpen(false)}
