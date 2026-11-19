@@ -15,6 +15,22 @@ export interface CurrentConfig {
   issues: Issue[];
 }
 
+/**
+ * Applies a successful save to the open config — but ONLY when the save's
+ * `path` still matches the config on screen. A save whose response lands
+ * while the user is switching to a different config must not stamp its
+ * text/sha256 onto the OTHER file's editor state (the disk write itself is
+ * already correctly scoped by the server's per-path staleness check).
+ * Exported for unit pinning: this is the whole cross-config guard.
+ */
+export function applySavedToConfig(
+  previous: CurrentConfig | null,
+  saved: { path: string; text: string; sha256: string },
+): CurrentConfig | null {
+  if (previous === null || previous.path !== saved.path) return previous;
+  return { ...previous, text: saved.text, sha256: saved.sha256 };
+}
+
 export type ToastKind = "info" | "error";
 
 type TabId = "providers" | "mcp" | "raw";
@@ -33,7 +49,14 @@ export function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>("raw");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  // Bumped every time a config payload is applied from disk (select/reload).
+  // The editor re-seeds on THIS counter, not on text identity, so a reload
+  // whose text happens to equal what we hold still resets the textarea.
+  const [loadNonce, setLoadNonce] = useState(0);
   const toastId = useRef(0);
+  // Sequence guard for selectConfig (the state effect's cancelled-flag
+  // pattern for a callback): only the latest load may apply.
+  const loadSeq = useRef(0);
 
   const addToast = useCallback((message: string, kind: ToastKind = "info") => {
     const id = (toastId.current += 1);
@@ -65,9 +88,14 @@ export function App() {
 
   const selectConfig = useCallback(
     async (path: string) => {
+      const seq = (loadSeq.current += 1);
       const result = await getConfig(path, folder);
+      // A newer selection (or folder switch) superseded this response: drop
+      // it so out-of-order replies can never open a stale config.
+      if (loadSeq.current !== seq) return;
       if (result.kind === "ok") {
         setCurrentConfig({ path, ...result.data });
+        setLoadNonce((nonce) => nonce + 1);
         setLoadError(null);
       } else {
         setCurrentConfig(null);
@@ -81,18 +109,22 @@ export function App() {
     if (currentConfig !== null) void selectConfig(currentConfig.path);
   }, [currentConfig, selectConfig]);
 
-  // After a successful save, the disk holds exactly what the editor shows:
-  // sync BOTH the editor-seed text and the staleness token. (Re-seeding the
-  // textarea on `config.text` then no-ops — the strings are equal — while a
-  // real Reload from disk changes the string and reseeds.)
-  const handleSaved = useCallback((text: string, sha256: string, backupPath: string) => {
-    setCurrentConfig((previous) => (previous === null ? previous : { ...previous, text, sha256 }));
-    addToast(`Saved. Backup: ${backupPath}`);
-  }, [addToast]);
+  // A successful save means the disk holds exactly the saved text for THAT
+  // path: sync both the editor-seed text and the staleness token, but only
+  // while that path is still the open config (see applySavedToConfig).
+  const handleSaved = useCallback(
+    (path: string, text: string, sha256: string, backupPath: string) => {
+      setCurrentConfig((previous) => applySavedToConfig(previous, { path, text, sha256 }));
+      addToast(`Saved. Backup: ${backupPath}`);
+    },
+    [addToast],
+  );
 
   const handleOpenFolder = useCallback((nextFolder: string) => {
+    loadSeq.current += 1; // a config load for the OLD folder may no longer apply
     setFolder(nextFolder);
     setCurrentConfig(null);
+    setLoadError(null);
   }, []);
 
   const activeTab = TABS.find((entry) => entry.id === tab);
@@ -146,6 +178,7 @@ export function App() {
             key={currentConfig.path}
             config={currentConfig}
             folder={folder}
+            loadNonce={loadNonce}
             onSaved={handleSaved}
             onReload={reloadCurrentConfig}
             onToast={addToast}

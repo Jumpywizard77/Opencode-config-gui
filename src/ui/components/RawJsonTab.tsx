@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { Issue } from "../../core/types";
 import type { CurrentConfig, ToastKind } from "../App";
@@ -7,7 +7,9 @@ import { getConfig, saveConfig, type SaveOutcome } from "../api";
 interface RawJsonTabProps {
   config: CurrentConfig;
   folder: string | undefined;
-  onSaved: (text: string, sha256: string, backupPath: string) => void;
+  /** Bumped by App on every disk load (select/reload) — the re-seed trigger. */
+  loadNonce: number;
+  onSaved: (path: string, text: string, sha256: string, backupPath: string) => void;
   onReload: () => void;
   onToast: (message: string, kind?: ToastKind) => void;
 }
@@ -20,32 +22,39 @@ interface RawJsonTabProps {
  * validated and backed up, never a blind overwrite). `new_issues` lists the
  * blocking problems and refuses; the edits stay in the textarea.
  */
-export function RawJsonTab({ config, folder, onSaved, onReload, onToast }: RawJsonTabProps) {
+export function RawJsonTab({
+  config,
+  folder,
+  loadNonce,
+  onSaved,
+  onReload,
+  onToast,
+}: RawJsonTabProps) {
   const [text, setText] = useState(config.text);
   const [saving, setSaving] = useState(false);
   const [stale, setStale] = useState(false);
   const [blockedIssues, setBlockedIssues] = useState<Issue[] | null>(null);
-  // The text App echoes back into `config.text` after OUR save. The re-seed
-  // effect below must not mistake that echo for a (re)load from disk — else
-  // edits typed during the save round-trip would be wiped.
-  const lastSavedText = useRef<string | null>(null);
 
-  // Re-seed the editor when the config is (re)loaded from disk — a reload or
-  // a config switch (switches also remount via the App-side `key`).
+  // Re-seed on the LOAD NONCE (a disk payload was just applied by App), never
+  // on text identity: a reload whose text happens to equal what `config`
+  // already holds MUST still reset the textarea and clear the stale/blocked
+  // banners. A plain save does NOT bump the nonce — it only syncs
+  // config.text/sha256 — so edits typed during the save round-trip survive.
+  // Config switches also remount via App's `key`; effects run on mount.
   useEffect(() => {
-    if (config.text === lastSavedText.current) return;
     setText(config.text);
     setStale(false);
     setBlockedIssues(null);
-  }, [config.text]);
+    // config.text is read fresh from the render the nonce bumped in; the
+    // nonce is the only intended trigger.
+  }, [loadNonce]);
 
   const handleOutcome = (outcome: SaveOutcome): void => {
     switch (outcome.kind) {
       case "ok":
         setStale(false);
         setBlockedIssues(null);
-        lastSavedText.current = text; // mark the echo App will hand back
-        onSaved(text, outcome.sha256, outcome.backupPath);
+        onSaved(config.path, text, outcome.sha256, outcome.backupPath);
         break;
       case "stale":
         setStale(true);
@@ -101,7 +110,7 @@ export function RawJsonTab({ config, folder, onSaved, onReload, onToast }: RawJs
       {stale && (
         <div className="stale-banner">
           The file changed on disk since you loaded it — your edits are not lost.{" "}
-          <button type="button" onClick={onReload}>
+          <button type="button" onClick={onReload} disabled={saving}>
             Reload
           </button>{" "}
           <button type="button" onClick={() => void forceSave()} disabled={saving || !dirty}>
