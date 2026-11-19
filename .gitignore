@@ -1,0 +1,7 @@
+# The partner's LIVE opencode config — never commit, never publish. Do not remove.
+opencode.json
+
+node_modules/
+dist/
+.superpowers/
+*.bak-*
