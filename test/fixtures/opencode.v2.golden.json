@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "providers": {
+    "Maya": {
+      "name": "Maya (local)",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": { "baseURL": "http://127.0.0.1:8080/v1" },
+      "models": {
+        "Qwen3.8-Flash-Next": {
+          "name": "Spike Qwen3.8-Flash-Next",
+          "limit": { "context": 131072, "output": 32000 },
+          "variants": [
+            { "id": "high", "settings": { "reasoningEffort": "high" } },
+            { "id": "low", "settings": { "reasoningEffort": "low" } }
+          ]
+        }
+      }
+    }
+  },
+  "model": "Maya/Qwen3.8-Flash-Next"
+}
