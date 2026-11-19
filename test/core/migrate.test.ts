@@ -207,6 +207,18 @@ describe("core/migrate", () => {
     expect(report.changes.filter((line) => line.includes("constructor →"))).toEqual([]);
   });
 
+  it("upgradeDocumentText_withNonObjectServersAndNumericTimeout_shouldRefuseAndPreserveServersValue", () => {
+    const doc = { mcp: { servers: "x", timeout: 30 } };
+    const { text, report } = upgradeDocumentText(JSON.stringify(doc, null, 2));
+
+    expect(text).toBe(JSON.stringify(doc, null, 2)); // whole mcp left alone
+    expect(obj(obj(JSON.parse(text)).mcp).servers).toBe("x"); // not silently replaced by {}
+    expect(obj(obj(JSON.parse(text)).mcp).timeout).toBe(30); // refusal wins over timeout reshape
+    expect(report.changes).toEqual([]);
+    expect(report.leftUnchanged[0]).toMatchObject({ path: "mcp" });
+    expect(report.leftUnchanged[0].reason).toContain("servers");
+  });
+
   it("computeUnifiedDiff_withChangedLine_producesUnifiedPatch", () => {
     const patch = computeUnifiedDiff("a\nb\n", "a\nc\n");
 

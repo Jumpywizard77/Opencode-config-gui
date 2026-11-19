@@ -238,16 +238,16 @@ function migrateMcp(val: JsonValue, report: MigrationReport): JsonValue {
     return val; // already v2 shape
   }
 
-  // Error path from spec rule 4: refuse the mcp merge rather than clobber
-  // existing `mcp.servers` entries.
+  // Error path from spec rule 4: refuse any mcp upgrade (flat move OR numeric
+  // timeout reshape) rather than clobber a `mcp.servers` value we can't merge.
+  if (hasServers && existingServers === undefined) {
+    report.leftUnchanged.push({
+      path: "mcp",
+      reason: "mcp.servers exists but is not an object — mcp left unchanged",
+    });
+    return val;
+  }
   if (flat.length > 0) {
-    if (hasServers && existingServers === undefined) {
-      report.leftUnchanged.push({
-        path: "mcp",
-        reason: "mcp.servers exists but is not an object — mcp left unchanged",
-      });
-      return val;
-    }
     const collisions = flat.filter(([k]) => existingServers !== undefined && hasOwn(existingServers, k));
     if (collisions.length > 0) {
       report.leftUnchanged.push({
