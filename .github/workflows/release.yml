@@ -65,7 +65,10 @@ jobs:
             chmod +x "$bin"
             (cd release && zip -qr "../opencode-config-gui-$name.zip" "opencode-config-gui-$name")
           done
-          ls -l release ../*.zip
+          # The zips above write to the workspace ROOT (cwd of this step), not
+          # into release/, so list them there — `../*.zip` would be the runner's
+          # parent dir and die under `set -euo pipefail` on the unmatched glob.
+          ls -l release *.zip
       - name: Attach to the GitHub Release
         uses: softprops/action-gh-release@v2
         with:

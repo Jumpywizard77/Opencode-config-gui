@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import type { AddressInfo } from "node:net";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 import { createConfigApiHandlers } from "./server/config-api.js";
 import { createExtraApiHandlers } from "./server/extra-api.js";
 import { createServer } from "./server/server.js";
+import { resolveStaticDir } from "./static-dir.js";
 
 /**
  * Entry point: parse flags, boot the loopback-only server and (unless asked
@@ -76,21 +75,10 @@ function parseArgs(argv: string[]): { options?: CliOptions; error?: string; help
     }
   }
 
-  // Candidate package roots, first match wins:
-  //  - `--static` (verbatim);
-  //  - for `node dist/cli.js` / the npm bin: dist/cli.js sits in <package>/dist,
-  //    so the package root is one up from import.meta.url;
-  //  - for a Bun-compiled single-file binary (see .github/workflows/release.yml):
-  //    import.meta.url points INSIDE the executable's embedded virtual FS, so
-  //    the release archive instead ships `dist/ui` next to the binary itself.
-  //    Under plain Node this candidate is just <node dir>/dist/ui, which does
-  //    not exist, so it is inert there.
-  const staticCandidates =
-    staticFlag !== undefined
-      ? [resolve(staticFlag)]
-      : [join(fileURLToPath(new URL("..", import.meta.url)), "dist", "ui"), join(dirname(process.execPath), "dist", "ui")];
-  const staticDir = staticCandidates.find((candidate) => existsSync(candidate));
-  // undefined when nothing exists to serve: static serving stays off
+  // Static-UI resolution (candidate ladder + guards) lives in static-dir.ts:
+  // npm/node path first, executable-relative fallback for Bun-compiled
+  // binaries. undefined = nothing exists to serve: static serving stays off.
+  const staticDir = resolveStaticDir(staticFlag);
   return { options: { port, folder: resolve(folder ?? process.cwd()), open, staticDir } };
 }
 
