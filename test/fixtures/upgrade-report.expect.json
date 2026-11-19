@@ -1,0 +1,23 @@
+{
+  "changes": [
+    "plugin → plugins (key renamed)",
+    "provider → providers (key renamed)",
+    "provider.unsloth.npm → package (@ai-sdk/openai-compatible → @opencode/ai/providers/openai-compatible)",
+    "provider.unsloth.options → settings (contents moved)",
+    "provider.unsloth.models.ukisai/Swift-1.5-Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S.variants → array of { id, settings } (4 variants)",
+    "provider.unsloth.models.unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL.variants → array of { id, settings } (4 variants)",
+    "provider.unsloth.models.ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF.variants → array of { id, settings } (4 variants)",
+    "provider.Strata.npm → package (@ai-sdk/openai-compatible → @opencode/ai/providers/openai-compatible)",
+    "provider.Strata.options → settings (contents moved)",
+    "provider.Strata.models.Strata/Qwen3.8-flash-next-iq3_s.variants → array of { id, settings } (4 variants)",
+    "provider.Basalt.npm → package (@ai-sdk/openai-compatible → @opencode/ai/providers/openai-compatible)",
+    "provider.Basalt.options → settings (contents moved)",
+    "provider.Basalt.models.Qwen3.8-Flash-Next.variants → array of { id, settings } (4 variants)",
+    "provider.Maya.npm → package (@ai-sdk/openai-compatible → @opencode/ai/providers/openai-compatible)",
+    "provider.Maya.options → settings (contents moved)",
+    "provider.Maya.models.glm-5.3-flash.variants → array of { id, settings } (4 variants)",
+    "mcp.comfy-mcp → mcp.servers.comfy-mcp",
+    "mcp.servers.comfy-mcp.enabled: true → dropped (v2 servers are enabled by default)"
+  ],
+  "leftUnchanged": []
+}
