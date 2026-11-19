@@ -130,19 +130,23 @@ describe("core/discovery", () => {
         platform: "win32",
         env: {
           APPDATA: "C:\\Users\\me\\AppData\\Roaming",
+          USERPROFILE: "C:\\Users\\me",
           PROGRAMDATA: "C:\\ProgramData",
         },
         cwd: "C:\\work\\proj",
         fsImpl: fsFake([
-          "C:\\Users\\me\\AppData\\Roaming\\opencode\\opencode.jsonc",
+          "C:\\Users\\me\\.config\\opencode\\opencode.jsonc",
+          "C:\\Users\\me\\AppData\\Roaming\\opencode\\opencode.json",
           "C:\\work\\proj\\opencode.json",
           "C:\\ProgramData\\opencode\\opencode.json",
         ]),
       });
 
+      // Global comes from USERPROFILE\.config even though APPDATA is set and a
+      // file exists under APPDATA\opencode; system stays %PROGRAMDATA%\opencode.
       expect(found).toEqual([
         {
-          path: "C:\\Users\\me\\AppData\\Roaming\\opencode\\opencode.jsonc",
+          path: "C:\\Users\\me\\.config\\opencode\\opencode.jsonc",
           kind: "global",
           editable: true,
         },
@@ -189,19 +193,22 @@ describe("core/discovery", () => {
   });
 
   describe("defaultGlobalConfigPath", () => {
-    it("defaultGlobalConfigPath_onWindows_withUserProfile_shouldUseWindowsConvention", () => {
-      expect(defaultGlobalConfigPath("win32", { USERPROFILE: "C:\\Users\\me" })).toBe(
-        "C:\\Users\\me\\.config\\opencode\\opencode.json",
-      );
+    it("defaultGlobalConfigPath_onWindows_withUserProfile_shouldUseUserProfileDotConfigConvention", () => {
+      // Ground truth (opencode 2.2.7, real Windows machine): the global config
+      // lives at %USERPROFILE%\.config\opencode\opencode.json.
+      const found = defaultGlobalConfigPath("win32", { USERPROFILE: "C:\\Users\\me" });
+      expect(found).toBe("C:\\Users\\me\\.config\\opencode\\opencode.json");
+      expect(found).toMatch(/\\\.config\\opencode\\opencode\.json$/);
     });
 
-    it("defaultGlobalConfigPath_onWindows_withAppData_shouldPreferAppData", () => {
+    it("defaultGlobalConfigPath_onWindows_withAppDataAndUserProfile_shouldIgnoreAppData", () => {
+      // APPDATA must never win: opencode does not read %APPDATA%\opencode.
       expect(
         defaultGlobalConfigPath("win32", {
           APPDATA: "C:\\Users\\me\\AppData\\Roaming",
           USERPROFILE: "C:\\Users\\me",
         }),
-      ).toBe("C:\\Users\\me\\AppData\\Roaming\\opencode\\opencode.json");
+      ).toBe("C:\\Users\\me\\.config\\opencode\\opencode.json");
     });
 
     it("defaultGlobalConfigPath_onLinux_withXdg_shouldPreferXdgConfigHome", () => {

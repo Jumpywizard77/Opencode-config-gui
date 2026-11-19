@@ -5,10 +5,10 @@ import { promisify } from "node:util";
 
 /**
  * Discovery of OpenCode config files, following the layout OpenCode
- * documents: a global config under `~/.config/opencode` (XDG / APPDATA on
- * Windows), project configs at `opencode.json(c)` and
- * `.opencode/opencode.json(c)`, plus read-only system-wide and managed
- * directories.
+ * documents: a global config under `~/.config/opencode` on every platform
+ * (`%USERPROFILE%\.config\opencode` on Windows), project configs at
+ * `opencode.json(c)` and `.opencode/opencode.json(c)`, plus read-only
+ * system-wide and managed directories.
  *
  * The module is pure: every filesystem read goes through the injected
  * `fsImpl` port and every platform/environment fact arrives via the input
@@ -65,17 +65,18 @@ function pathModule(platform: NodeJS.Platform): typeof path.win32 {
 /**
  * Directory holding the global config. OpenCode documents the global config
  * as `~/.config/opencode/opencode.json(c)` on every platform (it does NOT
- * use `Library/Application Support` on macOS). Windows convention: prefer
- * `%APPDATA%`, falling back to `%USERPROFILE%\.config`; POSIX: prefer
- * `$XDG_CONFIG_HOME`, falling back to `$HOME/.config`. With neither
- * environment variable set we anchor at the literal `~` so the path stays
- * informative instead of throwing.
+ * use `Library/Application Support` on macOS). Windows ground truth,
+ * verified against real opencode 2.2.7: the file lives at
+ * `%USERPROFILE%\.config\opencode\` — opencode does NOT read
+ * `%APPDATA%\opencode`, so APPDATA must never be consulted here. POSIX:
+ * prefer `$XDG_CONFIG_HOME`, falling back to `$HOME/.config`. With neither
+ * home environment variable set we anchor at the literal `~` so the path
+ * stays informative instead of throwing.
  */
 function globalConfigDir(platform: NodeJS.Platform, env: DiscoverConfigsInput["env"]): string {
   const p = pathModule(platform);
   if (platform === "win32") {
-    const base =
-      env.APPDATA ?? (env.USERPROFILE !== undefined ? p.join(env.USERPROFILE, ".config") : "~");
+    const base = env.USERPROFILE !== undefined ? p.join(env.USERPROFILE, ".config") : "~";
     return p.join(base, "opencode");
   }
   const base =
