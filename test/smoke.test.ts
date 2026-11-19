@@ -6,9 +6,12 @@ interface FixtureShape {
   mcp?: Record<string, { environment?: Record<string, string> }>;
 }
 
+function loadFixtureText(): string {
+  return readFileSync(new URL("fixtures/opencode.v1.sample.json", import.meta.url), "utf8");
+}
+
 function loadFixture(): FixtureShape {
-  const raw = readFileSync(new URL("fixtures/opencode.v1.sample.json", import.meta.url), "utf8");
-  return JSON.parse(raw) as FixtureShape;
+  return JSON.parse(loadFixtureText()) as FixtureShape;
 }
 
 describe("v1 sample fixture", () => {
@@ -22,5 +25,9 @@ describe("v1 sample fixture", () => {
     expect(fixture.provider?.["unsloth"]?.options?.apiKey).toBe("sk-test-unsloth");
     expect(fixture.provider?.["Strata"]?.options?.apiKey).toBe("sk-test-strata");
     expect(fixture.mcp?.["comfy-mcp"]?.environment?.["COMFY_BIN"]).toBe("C:\\tools\\comfy.exe");
+    // Built by concatenation so the partner's Windows username never appears as a
+    // literal in this file — the repo is destined for publication.
+    const forbidden = "tl" + "ree";
+    expect(loadFixtureText().toLowerCase()).not.toContain(forbidden);
   });
 });
