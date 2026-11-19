@@ -21,26 +21,66 @@ function asStr(value: JsonValue | undefined): string {
 interface VariantRowsProps {
   /** Path of the owning model object (`…models.<id>`). */
   modelPath: (string | number)[];
-  /** Raw `variants` value: array (v2 docs) or key→settings map (v1 docs). */
+  /** Raw `variants` value: array (v2 entries) or key→settings map (v1 entries). */
   variants: JsonValue | undefined;
-  docShape: DocShape;
+  /** The entry's CONTAINER shape (not the doc-level flag). */
+  shape: DocShape;
   apply: (edits: PathEdit[]) => void;
 }
 
 /**
- * Variant editor with BOTH storages: v2 docs keep an array of
- * `{ id, settings }`; v1 docs keep a `{ key: {…opts} }` map — the editor
- * NEVER reshapes the doc's own layout. `capabilities.reasoning` conversion
- * is offered for v2 docs only (it is a v2 concept).
+ * Pure conversion logic (unit-tested): well-formed `{ id, … }` entries yield
+ * the effort levels — a `none` variant becomes `toggle: true` instead of an
+ * effort entry — while entries that are not objects with a non-empty string
+ * `id` are REPORTED as `malformed` (they cannot be represented; the caller
+ * must warn that converting deletes them). `hadNone` is detected by the id
+ * itself, never by a length mismatch against the filtered list.
  */
-export function VariantRows({ modelPath, variants, docShape, apply }: VariantRowsProps) {
+export function reasoningFromVariants(rows: JsonValue[]): { reasoning: Obj; malformed: JsonValue[] } {
+  const effort: string[] = [];
+  const malformed: JsonValue[] = [];
+  let hadNone = false;
+  for (const row of rows) {
+    if (isObj(row) && typeof row["id"] === "string" && row["id"] !== "") {
+      if (row["id"] === "none") hadNone = true;
+      else effort.push(row["id"]);
+    } else {
+      malformed.push(row);
+    }
+  }
+  const reasoning: Obj = { supported: true, effort };
+  if (hadNone) reasoning["toggle"] = true;
+  return { reasoning, malformed };
+}
+
+/**
+ * Variant editor with BOTH storages: v2 entries keep an array of
+ * `{ id, settings }`; v1 entries keep a `{ key: {…opts} }` map — the editor
+ * NEVER reshapes the entry's own layout (an array/map that exists is edited
+ * AS that storage, whatever the container's nominal shape). The
+ * `capabilities.reasoning` conversion is offered for v2 entries with
+ * array-stored variants only (it is a v2 concept).
+ */
+export function VariantRows({ modelPath, variants, shape, apply }: VariantRowsProps) {
   const [presetLevel, setPresetLevel] = useState<Level>("medium");
 
   const variantsPath = [...modelPath, "variants"];
-  const v2Array = Array.isArray(variants) ? (variants as JsonValue[]) : variants === undefined ? [] : null;
-  const v1Map = isObj(variants) ? variants : variants === undefined ? {} : null;
+  // What to RENDER/APPEND, decided by the storage actually present (never a
+  // null-spread): a v2 entry with a hand-edited map keeps map editing.
+  // When `variants` is absent, the entry's nominal container shape decides
+  // the storage a first edit creates.
+  const rows: JsonValue[] | null = Array.isArray(variants)
+    ? (variants as JsonValue[])
+    : variants === undefined && shape === "v2"
+      ? []
+      : null;
+  const mapEntries: Obj | null = isObj(variants)
+    ? variants
+    : variants === undefined && shape === "v1"
+      ? {}
+      : null;
 
-  if (v2Array === null && v1Map === null) {
+  if (rows === null && mapEntries === null) {
     return (
       <div className="variant-rows">
         <span className="field-label">Variants</span>
@@ -57,11 +97,11 @@ export function VariantRows({ modelPath, variants, docShape, apply }: VariantRow
       : null;
 
   const addReasoningPreset = (): void => {
-    if (docShape === "v2") {
+    if (rows !== null) {
       apply([
         {
           path: variantsPath,
-          value: [...(v2Array as JsonValue[]), { id: presetLevel, settings: { reasoningEffort: presetLevel } }],
+          value: [...rows, { id: presetLevel, settings: { reasoningEffort: presetLevel } }],
         },
       ]);
     } else {
@@ -70,22 +110,19 @@ export function VariantRows({ modelPath, variants, docShape, apply }: VariantRow
   };
 
   const useCapabilitiesInstead = (): void => {
-    // v2 only. Effort levels come from the variant ids; a "none" variant
-    // becomes the boolean toggle instead of an effort entry.
-    const effort = (v2Array as JsonValue[])
-      .map((variant) => (isObj(variant) && typeof variant["id"] === "string" ? variant["id"] : ""))
-      .filter((id) => id !== "" && id !== "none");
-    const hadNone = effort.length !== (v2Array as JsonValue[]).length;
-    const reasoning: Obj = { supported: true, effort };
-    if (hadNone) reasoning["toggle"] = true;
-    if (
-      !window.confirm(
-        `Replace the variants array with capabilities.reasoning = ${JSON.stringify(reasoning)}? ` +
-          "The variants array is removed. This cannot be undone here.",
-      )
-    ) {
-      return;
+    // v2 entries only. Effort levels come from the variant ids; a "none"
+    // variant becomes the boolean toggle instead of an effort entry.
+    const { reasoning, malformed } = reasoningFromVariants(rows ?? []);
+    let message =
+      `Replace the variants array with capabilities.reasoning = ${JSON.stringify(reasoning)}? ` +
+      "The variants array is removed. This cannot be undone here.";
+    if (malformed.length > 0) {
+      message +=
+        ` NOTE: ${malformed.length} entr${malformed.length === 1 ? "y" : "ies"} ` +
+        `(currently: ${JSON.stringify(malformed).slice(0, 200)}) cannot be represented as reasoning ` +
+        "levels and will be REMOVED with the array.";
     }
+    if (!window.confirm(message)) return;
     apply([
       { path: [...modelPath, "capabilities", "reasoning"], value: reasoning },
       { path: variantsPath, value: undefined },
@@ -96,11 +133,11 @@ export function VariantRows({ modelPath, variants, docShape, apply }: VariantRow
     <div className="variant-rows">
       <span className="field-label">Variants</span>
 
-      {v2Array !== null && (
-        <V2Rows variantsPath={variantsPath} rows={v2Array} settingsOf={settingsOf} apply={apply} />
+      {rows !== null && (
+        <V2Rows variantsPath={variantsPath} rows={rows} settingsOf={settingsOf} apply={apply} />
       )}
-      {docShape === "v1" && v1Map !== null && (
-        <V1Rows variantsPath={variantsPath} entries={v1Map} apply={apply} />
+      {mapEntries !== null && (
+        <V1Rows variantsPath={variantsPath} entries={mapEntries} apply={apply} />
       )}
 
       <div className="variant-add">
@@ -114,7 +151,7 @@ export function VariantRows({ modelPath, variants, docShape, apply }: VariantRow
         <button type="button" onClick={addReasoningPreset}>
           + reasoningEffort preset
         </button>
-        {docShape === "v2" && v2Array !== null && v2Array.length > 0 && (
+        {shape === "v2" && rows !== null && rows.length > 0 && (
           <button type="button" className="variant-convert" onClick={useCapabilitiesInstead}>
             Use capabilities.reasoning instead
           </button>
@@ -152,7 +189,12 @@ function V2Rows({
               value={isObj(variant) ? asStr(variant["id"]) : asStr(variant)}
               disabled={settings === null}
               onChange={(event) =>
-                apply([{ path: [...variantsPath, index, "id"], value: event.target.value }])
+                apply([
+                  {
+                    path: [...variantsPath, index, "id"],
+                    value: event.target.value === "" ? undefined : event.target.value,
+                  },
+                ])
               }
             />
             {settings === null ? (

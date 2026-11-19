@@ -40,7 +40,8 @@ interface ProviderEditorProps {
   path: (string | number)[];
   /** All OTHER provider ids in the same container (rename collision checks). */
   otherIds: string[];
-  docShape: DocShape;
+  /** Field spelling for THIS entry, derived from its own CONTAINER (`entryShape`). */
+  shape: DocShape;
   apply: (edits: PathEdit[]) => void;
   onToast: (message: string, kind?: ToastKind) => void;
   /** After a committed ID rename, so the parent can move the selection. */
@@ -58,14 +59,14 @@ export function ProviderEditor({
   entry,
   path,
   otherIds,
-  docShape,
+  shape,
   apply,
   onToast,
   onRenamed,
 }: ProviderEditorProps) {
   const [idDraft, setIdDraft] = useState(entryId);
-  const packageKey = docShape === "v1" ? "npm" : "package";
-  const optionsKey = docShape === "v1" ? "options" : "settings";
+  const packageKey = shape === "v1" ? "npm" : "package";
+  const optionsKey = shape === "v1" ? "options" : "settings";
   const options = isObj(entry[optionsKey]) ? (entry[optionsKey] as Obj) : {};
   const models = isObj(entry["models"]) ? (entry["models"] as Obj) : {};
   const presetValue = asStr(entry[packageKey]);
@@ -75,7 +76,7 @@ export function ProviderEditor({
   // Which select option is active: derived from the stored value when it is a
   // known package; otherwise from this session's choice (local runtimes and
   // blank store NO package, so the file itself cannot tell them apart).
-  const storedPreset = PRESETS.find((preset) => preset[docShape] === presetValue);
+  const storedPreset = PRESETS.find((preset) => preset[shape] === presetValue);
   const activePreset = presetValue !== "" ? (storedPreset?.label ?? "custom") : (presetOverride ?? "blank");
   const isLocalPreset = LOCAL_PRESETS.includes(activePreset);
 
@@ -154,7 +155,7 @@ export function ProviderEditor({
             setPresetOverride(label);
             const preset = PRESETS.find((candidate) => candidate.label === label);
             if (preset !== undefined) {
-              apply([{ path: [...path, packageKey], value: preset[docShape] }]);
+              apply([{ path: [...path, packageKey], value: preset[shape] }]);
             } else if (label !== "custom") {
               // blank / ollama / lmstudio / vllm: no package key is written.
               apply([{ path: [...path, packageKey], value: undefined }]);
@@ -179,7 +180,7 @@ export function ProviderEditor({
             className="preset-free"
             type="text"
             spellCheck={false}
-            placeholder={docShape === "v1" ? "@ai-sdk/… npm package" : "package (e.g. @opencode/ai/providers/…)"}
+            placeholder={shape === "v1" ? "@ai-sdk/… npm package" : "package (e.g. @opencode/ai/providers/…)"}
             value={presetValue}
             onChange={(event) =>
               apply([
@@ -226,7 +227,7 @@ export function ProviderEditor({
       </div>
 
       <EnvRows env={Array.isArray(entry["env"]) ? (entry["env"] as JsonValue[]) : undefined} path={path} apply={apply} />
-      {docShape === "v2" && (
+      {shape === "v2" && (
         <HeaderRows headers={isObj(entry["headers"]) ? (entry["headers"] as Obj) : undefined} path={path} apply={apply} />
       )}
 
@@ -241,7 +242,7 @@ export function ProviderEditor({
                   modelId={modelId}
                   siblingIds={Object.keys(models).filter((other) => other !== modelId)}
                   model={model}
-                  docShape={docShape}
+                  shape={shape}
                   apply={apply}
                 />
               </div>
@@ -289,12 +290,16 @@ export function ProviderEditor({
   }
 }
 
-function EnvRows({ env, path, apply }: { env: JsonValue[] | undefined; path: (string | number)[]; apply: (edits: PathEdit[]) => void }) {
+function EnvRows({
+  env,
+  path,
+  apply,
+}: {
+  env: JsonValue[] | undefined;
+  path: (string | number)[];
+  apply: (edits: PathEdit[]) => void;
+}) {
   const rows = env ?? [];
-  const rewrite = (next: string[]): void => {
-    const cleaned = next.filter((row) => row !== "");
-    apply([{ path: [...path, "env"], value: cleaned.length === 0 ? undefined : cleaned }]);
-  };
   return (
     <div className="kv-block">
       <span className="field-label">env (variable names)</span>
@@ -305,18 +310,25 @@ function EnvRows({ env, path, apply }: { env: JsonValue[] | undefined; path: (st
             spellCheck={false}
             value={asStr(row)}
             onChange={(event) =>
-              rewrite(rows.map((existing, i) => (i === index ? event.target.value : asStr(existing))))
+              apply([{ path: [...path, "env", index], value: event.target.value }])
             }
           />
-          <button type="button" onClick={() => rewrite(rows.map((existing, i) => asStr(existing)).filter((_, i) => i !== index))}>
+          <button
+            type="button"
+            onClick={() => apply([{ path: [...path, "env"], value: rows.filter((_, i) => i !== index) }])}
+          >
             ✕
           </button>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={() => rewrite([...rows.map((row) => asStr(row)), ""])}
-      >
+      {/*
+       * "+ env var" persists an empty string AT THE NEXT INDEX (the
+       * SettingsCells "+ key" pattern): the row renders from the doc and is
+       * editable. An unfilled "" entry is a legal string element; deleting a
+       * row rewrites the array, so no empty rows are ever written as debris
+       * by removal.
+       */}
+      <button type="button" onClick={() => apply([{ path: [...path, "env", rows.length], value: "" }])}>
         + env var
       </button>
     </div>
@@ -335,6 +347,9 @@ function HeaderRows({
   const entries: [string, string][] = Object.entries(headers ?? {}).map(
     ([key, value]) => [key, asStr(value)] as [string, string],
   );
+  // Key renames/removals rewrite the object and DROP empty-key rows (a ""
+  // header name is meaningless on save); value edits are path-addressed so an
+  // added row with a still-empty key keeps rendering and stays editable.
   const rewrite = (next: [string, string][]): void => {
     const cleaned = next.filter(([key]) => key !== "");
     const value: Obj = {};
@@ -359,14 +374,18 @@ function HeaderRows({
             type="text"
             spellCheck={false}
             value={value}
-            onChange={(event) => replace(index, [key, event.target.value])}
+            onChange={(event) => apply([{ path: [...path, "headers", key], value: event.target.value }])}
           />
           <button type="button" onClick={() => rewrite(entries.filter((_, i) => i !== index))}>
             ✕
           </button>
         </div>
       ))}
-      <button type="button" onClick={() => rewrite([...entries, ["", ""]])}>
+      <button
+        type="button"
+        disabled={entries.some(([key]) => key === "")}
+        onClick={() => apply([{ path: [...path, "headers", ""], value: "" }])}
+      >
         + header
       </button>
     </div>

@@ -10,6 +10,17 @@ import { ProviderEditor } from "./ProviderEditor";
 /** Legacy opencode v1 stores providers under `provider`; v2 uses `providers`. */
 export type DocShape = "v1" | "v2";
 
+/**
+ * Field spelling follows the CONTAINER an entry lives in, not the doc-level
+ * flag: a `providers`-shaped entry inside a legacy doc still wants
+ * `package`/`settings`/variant-arrays (the schema validates per container,
+ * `additionalProperties: false`). `docShape` itself only drives the legacy
+ * banner and where NEW providers are created.
+ */
+export function entryShape(container: "provider" | "providers"): DocShape {
+  return container === "provider" ? "v1" : "v2";
+}
+
 type Obj = { [k: string]: JsonValue };
 
 function isObj(value: JsonValue | undefined): value is Obj {
@@ -282,7 +293,7 @@ export function ProviderList({
                 otherIds={entries
                   .filter((e) => e.container === selectedEntry.container && e.id !== selectedEntry.id)
                   .map((e) => e.id)}
-                docShape={docShape}
+                shape={entryShape(selectedEntry.container)}
                 apply={apply}
                 onToast={onToast}
                 onRenamed={(newId) => setSelected({ container: selectedEntry.container, id: newId })}

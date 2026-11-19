@@ -21,17 +21,18 @@ interface ModelEditorProps {
   /** The model's sibling keys, for rename collision checks. */
   siblingIds: string[];
   model: Obj;
-  docShape: DocShape;
+  shape: DocShape;
   apply: (edits: PathEdit[]) => void;
 }
 
 /**
- * One model entry. Field spellings follow the doc's own shape: v2 uses
- * `modelID` and `capabilities.{tools,temperature}` + `disabled`; v1 uses the
- * flat `id` / `tool_call` / `temperature` flags (its schema has no `disabled`
- * on models). Renaming the model key is a delete-old + create-new edit pair.
+ * One model entry. Field spellings follow the entry's CONTAINER shape: v2
+ * uses `modelID` and `capabilities.{tools,temperature}` + `disabled`; v1
+ * uses the flat `id` / `tool_call` / `temperature` flags (its schema has no
+ * `disabled` on models). Renaming the model key is a delete-old + create-new
+ * edit pair.
  */
-export function ModelEditor({ modelsPath, modelId, siblingIds, model, docShape, apply }: ModelEditorProps) {
+export function ModelEditor({ modelsPath, modelId, siblingIds, model, shape, apply }: ModelEditorProps) {
   const prefix = [...modelsPath, modelId];
   const [keyDraft, setKeyDraft] = useState(modelId);
 
@@ -98,12 +99,12 @@ export function ModelEditor({ modelsPath, modelId, siblingIds, model, docShape, 
           />
         </label>
         <label>
-          <span className="field-label">{docShape === "v2" ? "modelID" : "id (API model id)"}</span>
+          <span className="field-label">{shape === "v2" ? "modelID" : "id (API model id)"}</span>
           <input
             type="text"
             spellCheck={false}
-            value={asStr(docShape === "v2" ? model["modelID"] : model["id"])}
-            onChange={(event) => textEdit(docShape === "v2" ? "modelID" : "id", event.target.value)}
+            value={asStr(shape === "v2" ? model["modelID"] : model["id"])}
+            onChange={(event) => textEdit(shape === "v2" ? "modelID" : "id", event.target.value)}
           />
         </label>
         <label>
@@ -124,7 +125,7 @@ export function ModelEditor({ modelsPath, modelId, siblingIds, model, docShape, 
 
       <div className="bool-row">
         <span className="field-label">Capabilities</span>
-        {docShape === "v2" ? (
+        {shape === "v2" ? (
           <>
             <label className="bool">
               <input
@@ -179,7 +180,7 @@ export function ModelEditor({ modelsPath, modelId, siblingIds, model, docShape, 
       <VariantRows
         modelPath={prefix}
         variants={model["variants"]}
-        docShape={docShape}
+        shape={shape}
         apply={apply}
       />
     </div>
