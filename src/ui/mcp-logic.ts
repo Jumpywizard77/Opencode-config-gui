@@ -60,6 +60,30 @@ export function mcpEntryPath(container: McpContainer, name: string): (string | n
 }
 
 /**
+ * Structural keys of the FLAT `mcp` container: a flat entry named `timeout`
+ * would collide with the global `mcp.timeout` field, and `servers` with the
+ * v2 `mcp.servers` container — a structured save could clobber either. Exact
+ * match after trim (JSON keys are case-sensitive).
+ */
+export function isReservedMcpFlatKey(name: string): boolean {
+  const trimmed = name.trim();
+  return trimmed === "timeout" || trimmed === "servers";
+}
+
+/**
+ * Add/rename guard for entry names: an error message (to show inline, never
+ * silently swallow) or null when the name is fine. The reservation applies
+ * ONLY to the flat container — `timeout`/`servers` are legal SERVER keys
+ * under `mcp.servers`.
+ */
+export function validateMcpEntryName(container: McpContainer, name: string): string | null {
+  if (container === "flat" && isReservedMcpFlatKey(name)) {
+    return "Reserved name — timeout/servers are structural keys under mcp.";
+  }
+  return null;
+}
+
+/**
  * Where a NEW entry is created: the container already in use wins, otherwise
  * the document's own shape (mirrors the Providers tab's "new providers go to
  * the doc's OWN container" rule).

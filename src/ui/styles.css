@@ -612,6 +612,12 @@ code {
   gap: 8px;
 }
 
+.field-error {
+  color: var(--red);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
 .mcp-editor {
   display: flex;
   flex-direction: column;

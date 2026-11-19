@@ -13,6 +13,7 @@ import {
   MCP_TIMEOUT_KEYS,
   pickMcpContainer,
   timeoutTrioEdits,
+  validateMcpEntryName,
   type McpTimeoutKey,
 } from "../mcp-logic";
 import { McpEditor } from "./McpEditor";
@@ -66,6 +67,8 @@ export function McpList({
   const [edits, setEdits] = useState<PathEdit[]>([]);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [newName, setNewName] = useState("");
+  /** Inline refusal for reserved entry names (""-name/dup stays silent). */
+  const [addNameError, setAddNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [stale, setStale] = useState(false);
   const [blockedIssues, setBlockedIssues] = useState<Issue[] | null>(null);
@@ -74,6 +77,7 @@ export function McpList({
     setEdits([]);
     setSelected(null);
     setNewName("");
+    setAddNameError(null);
     setStale(false);
     setBlockedIssues(null);
   }, [loadNonce]);
@@ -251,7 +255,10 @@ export function McpList({
               spellCheck={false}
               placeholder="new server name"
               value={newName}
-              onChange={(event) => setNewName(event.target.value)}
+              onChange={(event) => {
+                setNewName(event.target.value);
+                setAddNameError(null);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") addEntry();
               }}
@@ -260,6 +267,7 @@ export function McpList({
               + add
             </button>
           </div>
+          {addNameError !== null && <div className="field-error">{addNameError}</div>}
         </div>
 
         <div className="provider-detail">
@@ -322,6 +330,12 @@ export function McpList({
     // New servers go to the container the doc already uses (else its shape) —
     // never a silent migration of existing entries.
     const container = pickMcpContainer(mcpBlock, docShape);
+    const nameError = validateMcpEntryName(container, name);
+    if (nameError !== null) {
+      setAddNameError(nameError); // shown inline; the draft stays editable
+      return;
+    }
+    setAddNameError(null);
     apply([
       {
         path: mcpEntryPath(container, name),

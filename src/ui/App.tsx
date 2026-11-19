@@ -251,6 +251,7 @@ export function App() {
           config={currentConfig}
           folder={folder}
           opencodeVersion={state?.opencodeVersion ?? null}
+          hasPendingEdits={providersDirty || mcpDirty}
           onToast={addToast}
           onReload={reloadCurrentConfig}
           onClose={() => setUpgradeOpen(false)}

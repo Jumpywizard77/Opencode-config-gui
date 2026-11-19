@@ -7,6 +7,7 @@ import {
   isEntryDisabled,
   renameMcpEdits,
   switchMcpTypeEdits,
+  validateMcpEntryName,
   type McpContainer,
   type McpType,
 } from "../mcp-logic";
@@ -54,6 +55,8 @@ export function McpEditor({
   onRenamed,
 }: McpEditorProps) {
   const [idDraft, setIdDraft] = useState(entryId);
+  /** Inline refusal for a reserved rename TARGET (""/duplicate revert stays silent). */
+  const [renameError, setRenameError] = useState<string | null>(null);
   const type = activeMcpType(entry);
   const disabled = isEntryDisabled(entry, container);
 
@@ -64,6 +67,12 @@ export function McpEditor({
       return;
     }
     if (next === entryId) return;
+    const nameProblem = validateMcpEntryName(container, next);
+    if (nameProblem !== null) {
+      setRenameError(nameProblem); // draft stays so the user can fix it
+      return;
+    }
+    setRenameError(null);
     apply(renameMcpEdits(path, next, entry));
     onRenamed(next);
   };
@@ -82,19 +91,25 @@ export function McpEditor({
   return (
     <div className="mcp-editor">
       <div className="field-grid">
-        <label>
-          <span className="field-label">Name (rename = delete + re-create)</span>
-          <input
-            type="text"
-            spellCheck={false}
-            value={idDraft}
-            onChange={(event) => setIdDraft(event.target.value)}
-            onBlur={commitRename}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") (event.target as HTMLInputElement).blur();
-            }}
-          />
-        </label>
+        <div>
+          <label>
+            <span className="field-label">Name (rename = delete + re-create)</span>
+            <input
+              type="text"
+              spellCheck={false}
+              value={idDraft}
+              onChange={(event) => {
+                setIdDraft(event.target.value);
+                setRenameError(null);
+              }}
+              onBlur={commitRename}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+              }}
+            />
+          </label>
+          {renameError !== null && <div className="field-error">{renameError}</div>}
+        </div>
         <label>
           <span className="field-label">Type</span>
           <select value={type} onChange={(event) => setType(event.target.value as McpType)}>

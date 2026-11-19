@@ -8,12 +8,14 @@ import {
   collectMcpEntries,
   disabledToggleEdits,
   isEntryDisabled,
+  isReservedMcpFlatKey,
   mcpEntryPath,
   mcpGlobalTimeoutForm,
   pickMcpContainer,
   renameMcpEdits,
   switchMcpTypeEdits,
   timeoutTrioEdits,
+  validateMcpEntryName,
 } from "../../src/ui/mcp-logic";
 
 /**
@@ -275,5 +277,26 @@ describe("global mcp.timeout", () => {
     expect(timeoutTrioEdits(undefined, "startup", "0")).toEqual([]);
     expect(timeoutTrioEdits(undefined, "startup", "-5")).toEqual([]);
     expect(timeoutTrioEdits(undefined, "startup", "1.5")).toEqual([]);
+  });
+});
+
+describe("reserved flat entry names (add/rename guard)", () => {
+  it("flags mcp.timeout and mcp.servers as reserved, exact-match after trim", () => {
+    expect(isReservedMcpFlatKey("timeout")).toBe(true);
+    expect(isReservedMcpFlatKey("servers")).toBe(true);
+    expect(isReservedMcpFlatKey("  timeout  ")).toBe(true);
+    expect(isReservedMcpFlatKey("Timeout")).toBe(false); // case matters: JSON keys are
+    expect(isReservedMcpFlatKey("my-servers")).toBe(false);
+    expect(isReservedMcpFlatKey("")).toBe(false);
+  });
+
+  it("validateMcpEntryName rejects reserved names in the FLAT container only", () => {
+    for (const name of ["timeout", "servers", " servers "]) {
+      expect(validateMcpEntryName("flat", name)).toMatch(/reserved name/i);
+    }
+    expect(validateMcpEntryName("flat", "comfy-mcp")).toBeNull();
+    // names that would be structural keys up top are perfectly legal SERVER keys
+    expect(validateMcpEntryName("servers", "timeout")).toBeNull();
+    expect(validateMcpEntryName("servers", "servers")).toBeNull();
   });
 });
