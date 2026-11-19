@@ -55,6 +55,8 @@ interface ProviderListProps {
   onToast: (message: string, kind?: ToastKind) => void;
   /** Reports unsaved structured edits so App can confirm on tab switch. */
   onDirty: (dirty: boolean) => void;
+  /** Opens the shared v1→v2 Upgrade dialog (App-owned; Task 12). */
+  onUpgrade: () => void;
 }
 
 /**
@@ -74,6 +76,7 @@ export function ProviderList({
   onReload,
   onToast,
   onDirty,
+  onUpgrade,
 }: ProviderListProps) {
   const [edits, setEdits] = useState<PathEdit[]>([]);
   const [selected, setSelected] = useState<Selection | null>(null);
@@ -193,8 +196,7 @@ export function ProviderList({
         <div className="legacy-banner">
           legacy shape — providers live under <code>provider</code>; edits stay there (no silent
           migration).{" "}
-          {/* TODO(Task 12): open the Upgrade preview/apply dialog from here. */}
-          <button type="button" disabled title="Upgrade preview ships in a later task.">
+          <button type="button" onClick={onUpgrade}>
             Upgrade
           </button>
         </div>

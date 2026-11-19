@@ -574,3 +574,135 @@ code {
 .variant-convert {
   font-style: italic;
 }
+
+/* ---- Schema badge (topbar) ------------------------------------------------ */
+
+.schema-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  font-size: 12px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 1px 7px;
+}
+
+.badge-green {
+  color: var(--accent);
+}
+
+.badge-amber {
+  color: var(--amber);
+}
+
+.badge-degraded {
+  color: var(--red);
+}
+
+/* ---- MCP tab --------------------------------------------------------------- */
+
+.mcp-list-tab {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+}
+
+.mcp-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.timeout-trio {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.timeout-fields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.timeout-fields label {
+  flex: 1;
+  min-width: 120px;
+  max-width: 200px;
+}
+
+.timeout-fields input {
+  width: 100%;
+}
+
+/* ---- Upgrade dialog --------------------------------------------------------- */
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.dialog {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  width: min(860px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dialog h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.upgrade-notice {
+  color: var(--amber);
+  font-size: 13px;
+}
+
+.upgrade-lists {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.upgrade-lists > div {
+  flex: 1;
+  min-width: 260px;
+}
+
+.upgrade-lists ul {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.upgrade-diff {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-input);
+  padding: 8px 10px;
+  font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+  font-size: 12.5px;
+  line-height: 1.4;
+  overflow: auto;
+  max-height: 40vh;
+  white-space: pre;
+}
+

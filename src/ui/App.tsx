@@ -3,9 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Issue } from "../core/types";
 import { getConfig, getState, type StatePayload } from "./api";
 import { ConfigPicker } from "./components/ConfigPicker";
+import { McpList } from "./components/McpList";
 import { detectDocShape, ProviderList } from "./components/ProviderList";
 import { RawJsonTab } from "./components/RawJsonTab";
+import { SchemaBadge } from "./components/SchemaBadge";
 import { Toast, type ToastMessage } from "./components/Toast";
+import { UpgradeDialog } from "./components/UpgradeDialog";
 import { ValidationPanel } from "./components/ValidationPanel";
 
 /** The config currently open in the editor (brief-mandated shape). */
@@ -38,7 +41,7 @@ type TabId = "providers" | "mcp" | "raw";
 
 const TABS: { id: TabId; label: string; placeholder: string | null }[] = [
   { id: "providers", label: "Providers", placeholder: null },
-  { id: "mcp", label: "MCP", placeholder: "MCP editing — coming in a later task." },
+  { id: "mcp", label: "MCP", placeholder: null },
   { id: "raw", label: "Raw JSON", placeholder: null },
 ];
 
@@ -54,9 +57,14 @@ export function App() {
   // The editor re-seeds on THIS counter, not on text identity, so a reload
   // whose text happens to equal what we hold still resets the textarea.
   const [loadNonce, setLoadNonce] = useState(0);
-  // Unsaved structured edits live in the Providers tab's state; a tab switch
-  // (remount) discards them, so App confirms first while this is true.
+  // Unsaved structured edits live in each structured tab's state; a tab
+  // switch (remount) discards them, so App confirms first while these are
+  // true (keyed to the tab currently on screen).
   const [providersDirty, setProvidersDirty] = useState(false);
+  const [mcpDirty, setMcpDirty] = useState(false);
+  // The v1→v2 Upgrade dialog is App-owned: both legacy banners (Providers and
+  // MCP) open the SAME one, and Apply → config reload flows through App.
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const toastId = useRef(0);
   // Sequence guard for selectConfig (the state effect's cancelled-flag
   // pattern for a callback): only the latest load may apply.
@@ -129,6 +137,7 @@ export function App() {
     setFolder(nextFolder);
     setCurrentConfig(null);
     setLoadError(null);
+    setUpgradeOpen(false); // the dialog targets the closed config
   }, []);
 
   // Computed ONCE per config load (controller ruling): the parsed root's
@@ -142,12 +151,18 @@ export function App() {
 
   const switchTab = useCallback(
     (next: TabId) => {
-      if (tab === "providers" && next !== tab && providersDirty) {
-        if (!window.confirm("Discard the unsaved provider changes in the Providers tab?")) return;
+      const dirtyLabel =
+        tab === "providers" && providersDirty
+          ? "Providers"
+          : tab === "mcp" && mcpDirty
+            ? "MCP"
+            : null;
+      if (next !== tab && dirtyLabel !== null) {
+        if (!window.confirm(`Discard the unsaved ${dirtyLabel} changes in the ${dirtyLabel} tab?`)) return;
       }
       setTab(next);
     },
-    [tab, providersDirty],
+    [tab, providersDirty, mcpDirty],
   );
 
   const activeTab = TABS.find((entry) => entry.id === tab);
@@ -162,11 +177,7 @@ export function App() {
           onSelect={(path) => void selectConfig(path)}
           onOpenFolder={handleOpenFolder}
         />
-        <span className="provenance" title="Schema provenance reported by the server">
-          {state === null
-            ? "…"
-            : `schema: ${state.schemaSource} (${state.schemaFetchedAt}) · opencode ${state.opencodeVersion ?? "unknown"}`}
-        </span>
+        <SchemaBadge state={state} onToast={addToast} />
       </header>
 
       <nav className="tabs">
@@ -207,6 +218,20 @@ export function App() {
             onReload={reloadCurrentConfig}
             onToast={addToast}
             onDirty={setProvidersDirty}
+            onUpgrade={() => setUpgradeOpen(true)}
+          />
+        ) : tab === "mcp" ? (
+          <McpList
+            key={currentConfig.path}
+            config={currentConfig}
+            folder={folder}
+            docShape={docShape}
+            loadNonce={loadNonce}
+            onSaved={handleSaved}
+            onReload={reloadCurrentConfig}
+            onToast={addToast}
+            onDirty={setMcpDirty}
+            onUpgrade={() => setUpgradeOpen(true)}
           />
         ) : (
           <RawJsonTab
@@ -220,6 +245,17 @@ export function App() {
           />
         )}
       </main>
+
+      {upgradeOpen && currentConfig !== null && (
+        <UpgradeDialog
+          config={currentConfig}
+          folder={folder}
+          opencodeVersion={state?.opencodeVersion ?? null}
+          onToast={addToast}
+          onReload={reloadCurrentConfig}
+          onClose={() => setUpgradeOpen(false)}
+        />
+      )}
 
       <Toast toasts={toasts} onDismiss={dismissToast} />
     </div>
