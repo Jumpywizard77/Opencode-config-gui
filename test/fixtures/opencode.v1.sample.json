@@ -1,0 +1,184 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"],
+  "provider": {
+    "unsloth": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Unsloth (local)",
+
+      "options": {
+        "baseURL": "http://127.0.0.1:8888/v1",
+        "apiKey": "sk-test-unsloth"
+      },
+      "models": {
+        "ukisai/Swift-1.5-Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S": {
+          "name": "Swift-1.5-Qwen3.8-27B-GSQ-RCO-GGUF:IQ3_S (local)",
+          "limit": {
+            "context": 209000,
+            "output": 100000          
+          },
+          "variants": {
+            "xhigh": {
+              "reasoningEffort": "xhigh"
+            },
+            "medium": {
+              "reasoningEffort": "medium"
+            },
+            "low": {
+              "reasoningEffort": "low"
+            },
+            "none": {
+              "reasoningEffort": "none"
+            }
+          }          
+        },
+        "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL": {
+          "name": "Qwen3.8-27B-GGUF:UD-Q4_K_XL (local)",
+          "limit": {
+            "context": 169500,
+            "output": 55000          
+          },
+          "variants": {
+            "xhigh": {
+              "reasoningEffort": "xhigh"
+            },
+            "medium": {
+              "reasoningEffort": "medium"
+            },
+            "low": {
+              "reasoningEffort": "low"
+            },
+            "none": {
+              "reasoningEffort": "none"
+            }          
+          }
+        },
+        "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF": {
+          "name": "Qwen3.8-27B-GSQ-RCO-GGUF (local)",
+          "limit": {
+            "context": 220000,
+            "output": 100000          
+          },
+          "variants": {
+            "xhigh": {
+              "reasoningEffort": "xhigh"
+            },
+            "medium": {
+              "reasoningEffort": "medium"
+            },
+            "low": {
+              "reasoningEffort": "low"
+            },
+            "none": {
+              "reasoningEffort": "none"
+            }
+          }  
+        }
+      }
+    },
+    "Strata": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Strata (local)",
+
+      "options": {
+        "baseURL": "http://127.0.0.1:8080/v1",
+        "apiKey": "sk-test-strata"
+      },
+      "models": {
+        "Strata/Qwen3.8-flash-next-iq3_s": {
+          "name": "Qwen3.8-flash-next-iq3_s (local)",
+          "limit": {
+            "context": 262144,
+            "output": 120000          
+          },
+          "variants": {
+            "high": {
+              "reasoningEffort": "high"
+            },
+            "medium": {
+              "reasoningEffort": "medium"
+            },
+            "low": {
+              "reasoningEffort": "low"
+            },
+            "none": {
+              "reasoningEffort": "none"
+            }
+          }
+        } 
+      }
+    },
+    "Basalt": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Basalt (local)",
+
+      "options": {
+        "baseURL": "http://127.0.0.1:8080/v1"
+      },
+      "models": {
+        "Qwen3.8-Flash-Next": {
+          "name": "Qwen3.8-FN NVFP4 (local)",
+          "limit": {
+            "context": 262144,
+            "output": 120000          
+          },
+          "variants": {
+            "high": {
+              "reasoningEffort": "high"
+            },
+            "medium": {
+              "reasoningEffort": "medium"
+            },
+            "low": {
+              "reasoningEffort": "low"
+            },
+            "none": {
+              "reasoningEffort": "none"
+            }
+          }
+        } 
+      }
+    },    
+    "Maya": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Maya (local)",
+      "options": {
+        "baseURL": "http://127.0.0.1:8080/v1"
+      },
+      "models": {
+        "glm-5.3-flash": {
+          "name": "Maya GLM-5.3-Flash (local)",
+          "limit": {
+            "context": 131072,
+            "output": 60000          
+          },
+          "variants": {
+            "high": {
+              "reasoningEffort": "high"
+            },
+            "medium": {
+              "reasoningEffort": "medium"
+            },
+            "low": {
+              "reasoningEffort": "low"
+            },
+            "none": {
+              "reasoningEffort": "none"
+            }
+          }
+        } 
+      }
+    }       
+  },
+  "mcp": {
+    "comfy-mcp": {
+      "type": "local",
+      "command": ["C:\\Users\\testuser\\AppData\\Local\\Programs\\Python\\Python314\\Scripts\\comfy-mcp.exe"],
+      "enabled": true,
+      "environment": {
+        "COMFY_BIN": "C:\\tools\\comfy.exe",
+        "COMFY_LOCAL_URL": "http://127.0.0.1:8008"
+      }
+    }
+  }
+}

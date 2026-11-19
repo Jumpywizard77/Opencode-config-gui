@@ -1,0 +1,35 @@
+{
+  "name": "opencode-config-gui",
+  "version": "0.1.0",
+  "description": "Local web app for editing OpenCode config files",
+  "type": "module",
+  "bin": {
+    "opencode-config-gui": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "dev:ui": "vite",
+    "dev:server": "node --watch dist/cli.js --no-open"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "diff": "^9.0.0",
+    "jsonc-parser": "^3.3.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
+  }
+}
