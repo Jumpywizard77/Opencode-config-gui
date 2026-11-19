@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -107,5 +107,61 @@ describe("core/schema", () => {
     expect(fetchCalls).toBe(1);
     expect(cached.source).toBe("remote");
     expect(cached.fetchedAt).toBe(refreshed.fetchedAt);
+  });
+
+  it("loadSchema_withMissingBundledFile_shouldFallBackToPermissiveSchemaWithoutThrowing", async () => {
+    // Last rung of the ladder: a packaged copy that is absent (e.g. dist/
+    // packaging forgot the JSON) must degrade to a permissive `{}` schema,
+    // never throw. The degraded provenance keeps `source: 'bundled'` but a
+    // distinct `fetchedAt` sentinel, so a `{}` validator can never masquerade
+    // as the real vendored copy in the fetchedAt-keyed validator cache.
+    const cacheDir = tempCacheDir();
+    const result = await loadSchema({
+      refresh: true,
+      cacheDir,
+      fetchImpl: async () => {
+        throw new Error("network down");
+      },
+      bundledPath: join(cacheDir, "absent-bundled-copy.json"),
+    });
+    expect(result.source).toBe("bundled");
+    expect(result.fetchedAt).toBe("bundled-missing");
+    expect(result.schema).toEqual({});
+
+    // Documented degradation: validation against `{}` becomes a permissive
+    // no-op rather than an error.
+    expect(validateConfigText(JSON.stringify({ bogus_root: 1, nonsense: [1, 2] }), result)).toEqual([]);
+  });
+
+  it("loadSchema_withCorruptCacheFile_shouldFallBackToBundled", async () => {
+    const cacheDir = tempCacheDir();
+    writeFileSync(join(cacheDir, "config-schema.json"), "{not json");
+    const result = await loadSchema({
+      refresh: true,
+      cacheDir,
+      fetchImpl: async () => {
+        throw new Error("network down");
+      },
+    });
+    expect(result.source).toBe("bundled");
+    expect(result.fetchedAt).toBe("bundled");
+    expect((result.schema as { $id?: string }).$id).toBe("https://opencode.ai/config.json");
+  });
+
+  it("loadSchema_withNonOkHttpResponse_shouldFallBackToCacheOrBundled", async () => {
+    const cacheDir = tempCacheDir();
+    const notFound = (async () => ({ ok: false, status: 404, json: async () => ({}) })) as unknown as typeof fetch;
+
+    // Cold cache: a 404 walks all the way down to the bundled copy.
+    const cold = await loadSchema({ refresh: true, cacheDir, fetchImpl: notFound });
+    expect(cold.source).toBe("bundled");
+
+    // Warm cache: after one good refresh, a failing refresh serves the cache.
+    const schema = readBundledSchema();
+    const ok = (async () => ({ ok: true, json: async () => schema })) as unknown as typeof fetch;
+    const warmed = await loadSchema({ refresh: true, cacheDir, fetchImpl: ok });
+    const stale = await loadSchema({ refresh: true, cacheDir, fetchImpl: notFound });
+    expect(stale.source).toBe("remote");
+    expect(stale.fetchedAt).toBe(warmed.fetchedAt);
   });
 });

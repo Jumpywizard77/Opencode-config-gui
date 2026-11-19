@@ -25,6 +25,8 @@ export interface LoadSchemaOptions {
   fetchImpl?: typeof fetch;
   /** Override the cache directory (tests). */
   cacheDir?: string;
+  /** Override the vendored-copy path (tests); see `bundledFallback` for degraded semantics. */
+  bundledPath?: string | URL;
 }
 
 const CACHE_FILE_NAME = "config-schema.json";
@@ -34,10 +36,28 @@ function cacheFilePath(opts: LoadSchemaOptions): string {
   return join(dir, CACHE_FILE_NAME);
 }
 
-function readBundledSchema(): object {
-  return JSON.parse(
-    readFileSync(new URL("./schema-bundled.json", import.meta.url), "utf8"),
-  ) as object;
+const BUNDLED_SCHEMA_URL = new URL("./schema-bundled.json", import.meta.url);
+
+/**
+ * The last rung of the never-throw ladder. A vendored copy that is absent,
+ * unparseable or a non-object (e.g. `dist/` packaging that forgot the JSON)
+ * degrades to a permissive `{}` schema — which makes `validateConfigText`
+ * match everything, a no-op rather than a crash. Provenance stays honest:
+ * `source` remains "bundled" (it came from the vendored-copy rung) but
+ * `fetchedAt` becomes the distinct sentinel "bundled-missing", so the
+ * fetchedAt-keyed validator cache can never mix a degraded `{}` validator
+ * with the real vendored schema's.
+ */
+function bundledFallback(bundledPath?: string | URL): SchemaSource {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(bundledPath ?? BUNDLED_SCHEMA_URL, "utf8"));
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return { schema: parsed, source: "bundled", fetchedAt: "bundled" };
+    }
+  } catch {
+    // degrade below
+  }
+  return { schema: {}, source: "bundled", fetchedAt: "bundled-missing" };
 }
 
 /** A malformed or partial cache file counts as a miss, never as an error. */
@@ -72,7 +92,8 @@ function writeCache(path: string, source: SchemaSource): void {
 /**
  * Fetch the live opencode config schema with a disk cache and a vendored
  * fallback. The ladder is refresh→cache→bundled and the function never
- * throws: any network, HTTP, parse or write failure just walks down it.
+ * throws: any network, HTTP, parse or write failure just walks down it, and
+ * a broken bundled copy itself degrades permissively (see `bundledFallback`).
  */
 export async function loadSchema(opts: LoadSchemaOptions = {}): Promise<SchemaSource> {
   const cachePath = cacheFilePath(opts);
@@ -99,7 +120,7 @@ export async function loadSchema(opts: LoadSchemaOptions = {}): Promise<SchemaSo
     // refresh failed: serve the cache, else the vendored copy
   }
 
-  return readCache(cachePath) ?? { schema: readBundledSchema(), source: "bundled", fetchedAt: "bundled" };
+  return readCache(cachePath) ?? bundledFallback(opts.bundledPath);
 }
 
 /** Absolute-URI `$ref` (anything with a `scheme://` prefix); `#/$defs/...` is local. */
