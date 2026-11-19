@@ -156,6 +156,33 @@ describe("probeModels", () => {
     ]);
   });
 
+  it("probeModels_withKeyEchoedInModelIds_shouldRedactEveryModelId", async () => {
+    // A malicious/misconfigured endpoint echoing the Bearer key back as model
+    // ids: no ProbeResult field — modelIds included — may contain the key.
+    const calls: FetchCall[] = [];
+    const fetchImpl = fetchFake(calls, () =>
+      jsonResponse({
+        data: [
+          { id: "sk-secret-echoed" },
+          { id: "pre-sk-secret-echoed-post" },
+          { id: "harmless-model" },
+        ],
+      }),
+    );
+
+    const result = await probeModels({
+      baseURL: "http://h:8080/v1",
+      apiKey: "sk-secret-echoed",
+      fetchImpl,
+    });
+
+    expect(result.status).toBe("ok");
+    expect(result.modelIds).toEqual(["***", "pre-***-post", "harmless-model"]);
+    for (const id of result.modelIds) {
+      expect(id).not.toContain("sk-secret-echoed");
+    }
+  });
+
   it("probeModels_withNonOpenAiBody_shouldReturnNotCompatible", async () => {
     const calls: FetchCall[] = [];
     const fetchImpl = fetchFake(calls, () => jsonResponse({ models: ["a", "b"] }));

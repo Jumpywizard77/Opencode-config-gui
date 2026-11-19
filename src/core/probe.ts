@@ -66,8 +66,8 @@ async function safeBodyText(res: Response): Promise<string> {
   }
 }
 
-/** OpenAI-shaped `{ data: [{ id }] }` → the ids; `undefined` when not parseable. */
-function parseModelIds(bodyText: string): string[] | undefined {
+/** OpenAI-shaped `{ data: [{ id }] }` → the ids; `undefined` when not parseable. Ids are scrubbed of the apiKey: an echoing endpoint must not smuggle the key back through `modelIds`. */
+function parseModelIds(bodyText: string, apiKey: string | undefined): string[] | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(bodyText);
@@ -86,7 +86,7 @@ function parseModelIds(bodyText: string): string[] | undefined {
     if (typeof entry === "object" && entry !== null) {
       const id = (entry as { id?: unknown }).id;
       if (typeof id === "string") {
-        ids.push(id);
+        ids.push(scrubSecrets(id, apiKey));
       }
     }
   }
@@ -95,8 +95,9 @@ function parseModelIds(bodyText: string): string[] | undefined {
 
 /**
  * Probe `{baseURL}/models` and classify the outcome. Never throws: every
- * failure mode lands in `status` with a scrubbed `detail` (never contains the
- * apiKey value). Each request is bounded by `AbortSignal.timeout(timeoutMs)`;
+ * failure mode lands in `status` with a scrubbed `detail`, and no returned
+ * `ProbeResult` field (including `modelIds`) ever contains the apiKey value.
+ * Each request is bounded by `AbortSignal.timeout(timeoutMs)`;
  * a network/timeout failure short-circuits the remaining candidates so the
  * whole probe stays within roughly one timeout budget.
  */
@@ -150,7 +151,7 @@ export async function probeModels(input: ProbeInput): Promise<ProbeResult> {
         break; // keyless retry is only meaningful for auth failures
       }
 
-      const modelIds = parseModelIds(body);
+      const modelIds = parseModelIds(body, apiKey);
       if (modelIds === undefined) {
         incompatibleDetail ??= `response from ${url} is not an OpenAI-style model list: ${safeBody}`;
         break;
