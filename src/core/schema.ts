@@ -5,8 +5,8 @@ import { join } from "node:path";
 import type { ErrorObject, ValidateFunction } from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
 
-import { parseJsonc } from "./jsonc";
-import type { Issue } from "./types";
+import { parseJsonc } from "./jsonc.js";
+import type { Issue } from "./types.js";
 
 /** Where the live schema is published; also the `$id` of the vendored copy. */
 export const REMOTE_SCHEMA_URL = "https://opencode.ai/config.json";

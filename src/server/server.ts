@@ -3,7 +3,7 @@ import type { Server, ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 
-import { json, requireLocalRequest, type ApiRoutes, type RequestContext } from "./http";
+import { json, requireLocalRequest, type ApiRoutes, type RequestContext } from "./http.js";
 
 /**
  * The whole HTTP shell: binds loopback, gates every `/api/*` request through

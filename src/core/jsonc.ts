@@ -7,7 +7,7 @@ import {
   type ParseError,
 } from "jsonc-parser";
 
-import type { Issue, JsonValue, PathEdit } from "./types";
+import type { Issue, JsonValue, PathEdit } from "./types.js";
 
 const BOM = "\uFEFF";
 

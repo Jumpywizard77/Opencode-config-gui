@@ -1,7 +1,7 @@
 import { createTwoFilesPatch } from "diff";
 
-import { parseJsonc } from "./jsonc";
-import type { JsonValue } from "./types";
+import { parseJsonc } from "./jsonc.js";
+import type { JsonValue } from "./types.js";
 
 /**
  * Human-readable outcome of `upgradeDocumentText`. Every removal or rewrite

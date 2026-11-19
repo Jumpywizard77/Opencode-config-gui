@@ -10,15 +10,15 @@ import {
   type DiscoveredConfig,
   type ExecFileImpl,
   type FsImpl,
-} from "../core/discovery";
+} from "../core/discovery.js";
 import {
   loadSchema,
   validateConfigText,
   type LoadSchemaOptions,
   type SchemaSource,
-} from "../core/schema";
-import type { Issue } from "../core/types";
-import { json, readBody, sha256, type ApiRoutes } from "./http";
+} from "../core/schema.js";
+import type { Issue } from "../core/types.js";
+import { json, readBody, sha256, type ApiRoutes } from "./http.js";
 
 /**
  * HTTP-facing config endpoints: state, read, save. All filesystem side
@@ -46,7 +46,7 @@ export interface ConfigApiDeps {
 // Path safety
 // ---------------------------------------------------------------------------
 
-type VetOutcome =
+export type VetOutcome =
   | { ok: true; entry: DiscoveredConfig }
   | { ok: false; status: number; error: string };
 
@@ -85,8 +85,11 @@ function withinRoot(rootKey: string, candidateKey: string): boolean {
  *    roots — the user home dir or the request's `?folder=` — as
  *    defense-in-depth against configs discovered via server-side defaults
  *    (e.g. cwd) that the user never opened.
+ *
+ * Exported for Task 9's `extra-api.ts`, which vets upgrade paths through
+ * this exact function (one path-safety implementation, no drift).
  */
-function vetConfigPath(
+export function vetConfigPath(
   deps: ConfigApiDeps,
   requestedPath: string,
   folder: string | undefined,
