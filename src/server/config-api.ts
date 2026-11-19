@@ -1,4 +1,5 @@
-import { copyFileSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { copyFileSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { constants } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import nodePath from "node:path";
@@ -148,6 +149,34 @@ function backupStamp(date: Date): string {
   );
 }
 
+const MAX_BACKUP_ATTEMPTS = 50;
+
+/**
+ * Copy `source` to a FRESH backup path next to it and return that path.
+ * The stamp has 1-second granularity, and rapid sequential saves (double
+ * Ctrl+S, upgrade-apply followed by a save) collide on it — a plain
+ * `copyFileSync` would silently overwrite the earlier backup, letting the
+ * safety net itself lose data. So the copy is exclusive (`COPYFILE_EXCL`,
+ * also race-proof against a concurrent saver) and a colliding name is
+ * retried with `-1`, `-2`, … suffixes.
+ */
+function writeBackup(source: string): string {
+  const stem = `${source}.bak-${backupStamp(new Date())}`;
+  for (let attempt = 0; attempt < MAX_BACKUP_ATTEMPTS; attempt += 1) {
+    const candidate = attempt === 0 ? stem : `${stem}-${attempt}`;
+    try {
+      copyFileSync(source, candidate, constants.COPYFILE_EXCL);
+      return candidate;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "EEXIST") continue;
+      throw err;
+    }
+  }
+  throw new Error(
+    `could not create a unique backup next to ${source} after ${MAX_BACKUP_ATTEMPTS} attempts`,
+  );
+}
+
 /**
  * The shared validated-save pipeline (the config-save route AND Task 9's
  * upgrade-apply call this — one implementation of backup + atomic write +
@@ -188,8 +217,7 @@ export async function saveValidated(
     return { ok: false, kind: "new_issues", newIssues: [...introduced.values()] };
   }
 
-  const backupPath = `${path}.bak-${backupStamp(new Date())}`;
-  copyFileSync(path, backupPath); // backup BEFORE any overwrite
+  const backupPath = writeBackup(path); // backup BEFORE any overwrite
 
   // Atomic replace: temp file in the SAME directory, then rename onto the
   // target (rename is atomic within a filesystem; on Windows Node replaces
@@ -199,7 +227,12 @@ export async function saveValidated(
     `.${nodePath.basename(path)}.tmp-${randomBytes(6).toString("hex")}`,
   );
   writeFileSync(tempPath, text);
-  renameSync(tempPath, path);
+  try {
+    renameSync(tempPath, path);
+  } catch (err) {
+    rmSync(tempPath, { force: true }); // no orphaned temp residue on failure
+    throw err;
+  }
 
   return { ok: true, sha256: sha256(text), backupPath };
 }

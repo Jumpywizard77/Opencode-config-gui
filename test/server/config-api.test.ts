@@ -217,6 +217,47 @@ describe("server/config-api", () => {
     expect(readdirSync(harness.dir).filter((name) => name.includes(".tmp-"))).toEqual([]);
   });
 
+  it("save_twiceInSameSecond_shouldKeepBothBackups", async () => {
+    // Rapid sequential saves (Ctrl+S twice, or upgrade-apply + save) hit the
+    // 1-second backup stamp. The backup net must never eat an earlier
+    // backup: each save gets its own file, and the FIRST save's backup keeps
+    // the original bytes.
+    const harness = await boot();
+    const got = await call(harness, "GET", getConfigUrl(harness, harness.configPath));
+    const originalText: string = got.body.text;
+
+    const firstText = originalText.replace('"Maya (local)"', '"Maya (edit one)"');
+    const secondText = firstText.replace('"Maya (edit one)"', '"Maya (edit two)"');
+    const saveUrl = `/api/config/save${query({ folder: harness.dir })}`;
+
+    const first = await call(harness, "POST", saveUrl, {
+      path: harness.configPath,
+      text: firstText,
+      baseSha256: got.body.sha256,
+      baseIssues: [],
+    });
+    expect(first.status).toBe(200);
+    const second = await call(harness, "POST", saveUrl, {
+      path: harness.configPath,
+      text: secondText,
+      baseSha256: first.body.sha256,
+      baseIssues: [],
+    });
+    expect(second.status).toBe(200);
+
+    expect(second.body.backupPath).not.toBe(first.body.backupPath);
+    const backups = readdirSync(harness.dir).filter((name) => name.includes(".bak-")).sort();
+    expect(backups).toHaveLength(2);
+    for (const name of backups) {
+      expect(name).toMatch(/^opencode\.json\.bak-\d{8}-\d{6}(-\d+)?$/);
+    }
+    // The first save's backup survived the second save and still holds the
+    // pre-first-save (original) bytes; the second holds the first edit.
+    expect(readFileSync(first.body.backupPath, "utf8")).toBe(originalText);
+    expect(readFileSync(second.body.backupPath, "utf8")).toBe(firstText);
+    expect(readFileSync(harness.configPath, "utf8")).toBe(secondText);
+  });
+
   it("save_withPreExistingError_inUntouchedSection_shouldSucceedWithWarningFreeResponse", async () => {
     const harness = await boot();
     const doc = JSON.parse(FIXTURE_TEXT);
