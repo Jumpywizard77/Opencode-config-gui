@@ -6,6 +6,8 @@ browser, shows every OpenCode config it can find, and lets you edit them
 without hand-juggling JSON — while keeping your API keys in your own files,
 where they already live.
 
+![The provider editor: structured fields, endpoint probe, and variant rows](assets/opencode-config-gui.png)
+
 ## Why
 
 Editing provider configs by hand is error-prone: comments and formatting get
@@ -13,7 +15,7 @@ flattened by careless tools, the v1 → v2 config migration is fiddly, and it is
 hard to tell whether a provider's `baseURL` actually works until opencode
 fails in a session. This tool:
 
-- **Keeps your file your file.** It edits JSONC *in place*: comments, key
+- **Keeps your file yours.** It edits JSONC *in place*: comments, key
   order and formatting survive round-trips (only the lines you touch change).
 - **Validates before saving**, against the official OpenCode config schema,
   and refuses writes that would introduce *new* errors into an otherwise
@@ -134,6 +136,13 @@ triggers the GitHub release workflow: it compiles single-file binaries with
 Bun for windows/linux/darwin × x64/arm64 and attaches them to the release —
 each archive ships the binary plus its `dist/` data folder (vendored schema
 and built UI) next to it.
+
+## About this code
+
+This codebase was written almost entirely by AI coding agents, directed and
+reviewed by a human who mostly just said "sir, yes sir." Expect it to work —
+134 tests and several review passes say so — but extend it at your own risk,
+and keep the same sense of humor in the pull requests.
 
 ## License
 
