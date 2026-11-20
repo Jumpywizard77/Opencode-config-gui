@@ -20,6 +20,7 @@
     "build": "tsc -p tsconfig.build.json && vite build && node scripts/postbuild.mjs",
     "smoke": "node scripts/smoke.mjs",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "start": "node dist/cli.js",
     "dev:ui": "vite",
     "dev:server": "node --watch dist/cli.js --port 8710 --no-open"
   },

@@ -52,6 +52,18 @@ Flags:
 
 Requires Node.js 20 or newer at runtime.
 
+### Running straight from a clone
+
+Prefer not to go through `npx`? Clone the repo and use the launcher for
+your platform — both install dependencies and build on first run, then
+start the server. Any arguments pass through to the CLI:
+
+```
+.\launch.bat --folder .\my-project     # Windows
+./launch.sh --folder ~/my-project      # Linux / macOS
+npm start -- --folder ./my-project     # any platform (needs a build first)
+```
+
 ## What you can do
 
 - **Providers** — structured editor with presets for the common npm packages

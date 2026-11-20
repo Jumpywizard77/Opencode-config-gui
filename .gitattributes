@@ -1,0 +1,5 @@
+# Line-ending rules so the launchers work on their target platforms.
+# A CRLF .sh breaks the shebang line; a .bat is happiest with CRLF.
+*.sh   text eol=lf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
