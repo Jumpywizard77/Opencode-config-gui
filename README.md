@@ -134,3 +134,9 @@ triggers the GitHub release workflow: it compiles single-file binaries with
 Bun for windows/linux/darwin × x64/arm64 and attaches them to the release —
 each archive ships the binary plus its `dist/` data folder (vendored schema
 and built UI) next to it.
+
+## License
+
+Released under the [MIT License](LICENSE) - do whatever you want with it,
+just keep the copyright line. Your configs and your API keys were never
+part of the deal anyway; they stay in your files.
