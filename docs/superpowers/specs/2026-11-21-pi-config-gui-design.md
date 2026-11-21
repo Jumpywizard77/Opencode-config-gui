@@ -1,7 +1,7 @@
 # pi-config-gui — Design
 
 Date: 2026-11-21
-Status: draft (pending partner approval)
+Status: approved by partner (2026-11-21)
 Author: Ranger 1 + partner brainstorm
 Sister project: `docs/superpowers/specs/2026-11-19-opencode-config-gui-design.md`
 
@@ -47,7 +47,13 @@ shows the models — with their file's comments and formatting preserved.
    `{baseUrl}/models` and checkbox import of what's actually serving
    (imported models get pi's schema defaults `contextWindow: 128000`,
    `maxTokens: 16384`, marked for review). Probe reuses the opencode app's
-   key-scrubbing rules.
+   key-scrubbing rules. Re-probing **merges by model ID**: existing
+    entries are never touched (hand-tuned limits survive), only unseen IDs
+    are offered/appended; "marked for review" is UI-only state and is never
+    written into the file. The probe resolves literal and `$ENV` keys only
+    — the GUI server never executes a `!command` from config; for such keys
+    it shows a notice and offers one-off testing with a pasted resolved
+    value.
 5. Provider editor for `models.json` providers: `name`, `baseUrl`, `api`
    (select from the four documented API families + free text), `apiKey`
    (masked; supports literal, `$NAME`/`${NAME}` env interpolation, and
@@ -87,6 +93,12 @@ shows the models — with their file's comments and formatting preserved.
     introduced* validation errors, exclusive timestamped backups, atomic
     write via temp + rename. Editing is surgical path-edits so formatting,
     key order, and existing `//` comments in `models.json` are preserved.
+    Per-document conflict semantics: `models.json` keeps the classic
+    staleness/Force-save behavior; `auth.json` edits are path-edits
+    **rebased onto freshly-read disk content** at save time (pi refreshes
+    OAuth tokens in that file while it runs, and a force-save of a stale
+    snapshot could revoke a live session). A conflict is raised only when
+    an entry the user actually touched changed on disk.
 12. Cross-platform: Windows/macOS/Linux, same CI matrix as the sister app.
 
 ## Non-goals
@@ -166,6 +178,25 @@ Previously settled with the partner: self-contained fork in a subfolder
 - Self-contained fork in `pi-config-gui/`, built and run entirely from
   there.
 - Build via Approach 1.
+- Publish/CI story: **no repo-infra changes in v1**. `.github/` stays
+  untouched (opencode's `v*`-tagged `release.yml` is unaffected); the fork
+  carries its own `package.json` + `prepublishOnly` (typecheck+test+build);
+  an npm publish under the (currently unclaimed) name `pi-config-gui` is a
+  manual, opt-in act by the partner whenever they choose. No binaries, no
+  CI workflows for pi-config-gui in v1.
+
+## Settled during builder-check (partner-approved)
+
+1. `auth.json` saves **rebase** surgical path-edits onto freshly-read disk
+   content (pi rewrites that file live — refreshing OAuth tokens — so a
+   Force-save of a stale snapshot could revoke a live session). Conflict
+   only when an entry the user touched changed. `models.json` keeps the
+   classic staleness/Force-save semantics.
+2. Probe-import **merges by model ID**, never overwrites existing entries;
+   "marked for review" is UI-only, never written to the file.
+3. The GUI server **never executes `!command`** api-key values from config;
+   probe supports literal and `$ENV` keys, with a notice + paste-to-test
+   escape hatch for the rest.
 
 ## Left to the builder
 
@@ -176,9 +207,6 @@ Previously settled with the partner: self-contained fork in a subfolder
 - The static list of known built-in provider IDs for autocomplete (from
   pi's providers docs; keep it a tiny data file, staliness tolerated).
 - `thinkingLevelMap` UX: JSON sub-editor (acceptable) vs. level rows.
-- Whether to port the GitHub release workflow (six bun-compiled binaries)
-  in v1 or ship npm-only first — recommend npm-first, wire releases after
-  the app is stable.
 - Depth of the `auth.json` hand-written schema (at minimum: known
   credential types validated, unknown types accepted with a warning).
 - Test fixtures: hand-write a realistic commented `models.json` and an
