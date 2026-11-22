@@ -104,9 +104,10 @@ npm start -- --no-open                            # any platform (needs a build 
   generic custom endpoint). `api` strings, masked `apiKey` (literal, `$NAME`
   / `${NAME}` env and `!command` forms), `headers` rows, `authHeader`, and a
   provider-level `compat` block as schema-validated JSON. Per-model fields
-  (`reasoning`, `input`, `contextWindow`, `maxTokens`, `cost`, …) plus a
-  `modelOverrides` editor keyed by model ID. Built-in provider rerouting
-  (setting only `baseUrl` under e.g. `"anthropic"`) uses the same form.
+  (`reasoning`, guided `thinkingLevelMap` reasoning levels, `input`,
+  `contextWindow`, `maxTokens`, `cost`, …) plus a `modelOverrides` editor
+  keyed by model ID. Built-in provider rerouting (setting only `baseUrl`
+  under e.g. `"anthropic"`) uses the same form.
 - **Endpoint probe + import** — check `baseUrl` (+ key) against `/models`;
   get ok / auth-failed / unreachable / not-compatible plus the model list.
   Import merges **by model ID**: existing entries are never overwritten, and
@@ -124,6 +125,49 @@ npm start -- --no-open                            # any platform (needs a build 
   package, so it also works offline. `auth.json` has no published schema; a
   small hand-written one covers the documented credential shapes and accepts
   unknown entry shapes with a warning.
+
+### Reasoning levels (`thinkingLevelMap`)
+pi's per-model reasoning control is `thinkingLevelMap`, not opencode's
+`reasoningEffort` variants: the map stores the provider's own value for each
+pi thinking level. The model editor has a **thinkingLevelMap** toggle.
+Enabling it seeds all seven levels pi offers (`off`/none, `minimal`, `low`,
+`medium`, `high`, `xhigh`, `max`) with the level name as the provider value,
+then shows an editable box next to each one and an **unsupported** checkbox
+(which stores `null`, pi's explicit "level unavailable" marker). Edit the
+boxes to match the provider — OpenAI-compatible endpoints usually expect
+`reasoning_effort` values (`none`, `low`, `medium`, `high`), while Anthropic
+uses its own effort spellings.
+
+```json
+{
+  "providers": {
+    "openrouter": {
+      "models": [
+        {
+          "id": "some-model",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": null,
+            "max": null
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Gotchas:
+- An **absent** level is not the same as `null`: absent falls back to the
+  provider's default value through `high`, while `null` marks the level
+  unsupported. `xhigh` and `max` are unsupported unless explicitly mapped.
+- Turning the toggle off deletes the whole map (provider defaults apply).
+- Hand-edited keys outside pi's seven levels are preserved and remain
+  editable; pi only reads the seven level keys, so anything else is ignored.
 
 ## `//` comments in models.json
 
@@ -227,7 +271,7 @@ the shebang and exec bit on `dist/cli.js`.
 This codebase was written almost entirely by AI coding agents, directed and
 reviewed by a human who mostly just said "sir, yes sir." It is a
 self-contained fork of opencode-config-gui; the duplication across the folder
-boundary is by design. Expect it to work — 180 tests and a stack of review
+boundary is by design. Expect it to work — 187 tests and a stack of review
 passes say so — but extend it at your own risk.
 
 ## License

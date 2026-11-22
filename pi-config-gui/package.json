@@ -2,6 +2,14 @@
   "name": "pi-config-gui",
   "version": "0.1.0",
   "description": "Local web app for editing Pi agent config files",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jumpywizard77/pi-config-gui.git"
+  },
+  "homepage": "https://github.com/Jumpywizard77/pi-config-gui#readme",
+  "bugs": {
+    "url": "https://github.com/Jumpywizard77/pi-config-gui/issues"
+  },
   "license": "MIT",
   "type": "module",
   "bin": {

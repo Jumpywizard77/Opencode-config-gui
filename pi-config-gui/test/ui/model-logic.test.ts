@@ -12,8 +12,12 @@ import {
   planImportRows,
   renameModelEdits,
   renameOverrideEdits,
+  seedThinkingLevelMap,
   setModelFieldEdits,
   setOverrideFieldEdits,
+  thinkingLevelEdits,
+  thinkingLevelMapToggleEdits,
+  thinkingLevelRows,
 } from "../../src/ui/model-logic";
 
 /**
@@ -229,6 +233,87 @@ describe("modelEditorKeys (id-aware React keys — fix round 1)", () => {
 
   it("an empty id string falls back to the index key", () => {
     expect(modelEditorKeys([{ id: "" }])).toEqual(["idx:0"]);
+  });
+});
+
+describe("thinkingLevelMap (guided reasoning levels)", () => {
+  it("renders all seven pi levels in schema order, marking absent ones unmapped", () => {
+    // GIVEN a map with only two levels stored:
+    const map = { medium: "medium", high: null };
+
+    // WHEN we build the editor rows,
+    const rows = thinkingLevelRows(map);
+
+    // THEN every pi level has a row (absent = provider default, null = unsupported):
+    expect(rows).toEqual([
+      { level: "off", known: true, mapped: false, value: undefined },
+      { level: "minimal", known: true, mapped: false, value: undefined },
+      { level: "low", known: true, mapped: false, value: undefined },
+      { level: "medium", known: true, mapped: true, value: "medium" },
+      { level: "high", known: true, mapped: true, value: null },
+      { level: "xhigh", known: true, mapped: false, value: undefined },
+      { level: "max", known: true, mapped: false, value: undefined },
+    ]);
+  });
+
+  it("hand-edited keys outside pi's seven levels are preserved as extra rows", () => {
+    // GIVEN a map with one non-schema key:
+    const rows = thinkingLevelRows({ custom: "x" });
+
+    // WHEN / THEN the seven schema rows come first, then the unknown key:
+    expect(rows).toHaveLength(8);
+    expect(rows[rows.length - 1]).toEqual({ level: "custom", known: false, mapped: true, value: "x" });
+  });
+
+  it("undefined or non-object maps render no rows (the malformed-map warning path)", () => {
+    expect(thinkingLevelRows(undefined)).toEqual([]);
+    expect(thinkingLevelRows(["high"])).toEqual([]);
+    expect(thinkingLevelRows("high")).toEqual([]);
+  });
+
+  it("toggling the map on seeds all seven levels; toggling it off deletes the whole map", () => {
+    const mapPath = ["providers", "p", "models", 0, "thinkingLevelMap"];
+
+    // GIVEN the toggle-enable edit,
+    const enable = thinkingLevelMapToggleEdits(mapPath, true);
+
+    // WHEN applied to a model with no map yet,
+    const text = `{"providers":{"p":{"models":[{"id":"a"}]}}}`;
+    const out = applyPathEdits(text, enable);
+    const entry = (parseJsonc(out).value as any).providers.p.models[0];
+
+    // THEN the map exists with a sane, editable starting value per level:
+    expect(entry.thinkingLevelMap).toEqual({
+      off: "none",
+      minimal: "minimal",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: "xhigh",
+      max: "max",
+    });
+    expect(enable).toEqual([{ path: mapPath, value: seedThinkingLevelMap() }]);
+    expect(thinkingLevelMapToggleEdits(mapPath, false)).toEqual([{ path: mapPath, value: undefined }]);
+  });
+
+  it("one level edit writes string or null; undefined restores the provider default", () => {
+    const mapPath = ["providers", "p", "models", 0, "thinkingLevelMap"];
+
+    // GIVEN an existing unsupported high level (null),
+    const text = `{"providers":{"p":{"models":[{"id":"a","thinkingLevelMap":{"high":null}}]}}}`;
+
+    // WHEN the user types a provider effort for it,
+    const out = applyPathEdits(text, thinkingLevelEdits(mapPath, "high", "high"));
+    const entry = (parseJsonc(out).value as any).providers.p.models[0];
+
+    // THEN the row stores the string, while null/undefined edits stay path-addressed:
+    expect(entry.thinkingLevelMap).toEqual({ high: "high" });
+    expect(thinkingLevelEdits(mapPath, "high", null)).toEqual([
+      { path: [...mapPath, "high"], value: null },
+    ]);
+    expect(thinkingLevelEdits(mapPath, "high", undefined)).toEqual([
+      { path: [...mapPath, "high"], value: undefined },
+    ]);
   });
 });
 

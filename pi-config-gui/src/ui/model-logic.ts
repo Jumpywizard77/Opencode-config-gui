@@ -29,6 +29,80 @@ export const IMPORT_DEFAULT_LIMITS = { contextWindow: 128000, maxTokens: 16384 }
 /** jsonc-parser `modify` resolves this out-of-range index to "append at end". */
 export const MODEL_APPEND = -1;
 
+/** pi's seven thinking levels, in schema order (`off` is the "none" level). */
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+
+/** One row of the guided `thinkingLevelMap` editor. */
+export interface ThinkingLevelRow {
+  /** Level key as stored (a pi level, or a hand-edited key outside the schema). */
+  level: string;
+  /** False for keys outside pi's seven thinking levels (preserved, not dropped). */
+  known: boolean;
+  /** False when the key is absent — the provider default applies instead. */
+  mapped: boolean;
+  /** Stored provider value; `undefined` = unmapped, `null` = unsupported. */
+  value: JsonValue | undefined;
+}
+
+function isPlainObject(value: JsonValue | undefined): value is { [k: string]: JsonValue } {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The rows the guided editor renders: all seven pi levels in schema order
+ * (mapped or absent), then any hand-edited keys outside the seven. An absent
+ * level still gets a row so the user can map it; the stored value is
+ * `undefined` there, which is NOT the same as `null` (unsupported).
+ */
+export function thinkingLevelRows(map: JsonValue | undefined): ThinkingLevelRow[] {
+  if (!isPlainObject(map)) return [];
+  const rows: ThinkingLevelRow[] = THINKING_LEVELS.map((level) => {
+    const mapped = Object.prototype.hasOwnProperty.call(map, level);
+    return { level, known: true, mapped, value: mapped ? map[level] : undefined };
+  });
+  const knownLevels = new Set<string>(THINKING_LEVELS);
+  for (const [level, value] of Object.entries(map)) {
+    if (!knownLevels.has(level)) rows.push({ level, known: false, mapped: true, value });
+  }
+  return rows;
+}
+
+/**
+ * The preset written when the toggle enables `thinkingLevelMap`: every pi
+ * level, each sending its own name as the provider value (`off` uses OpenAI's
+ * "none"). These are starting points, not truths — edit the boxes to match
+ * the provider (Anthropic and others use different effort spellings).
+ */
+export function seedThinkingLevelMap(): { [level: string]: string } {
+  return {
+    off: "none",
+    minimal: "minimal",
+    low: "low",
+    medium: "medium",
+    high: "high",
+    xhigh: "xhigh",
+    max: "max",
+  };
+}
+
+/** Enable (seeds all seven levels) or disable (deletes the map) the toggle. */
+export function thinkingLevelMapToggleEdits(
+  mapPath: (string | number)[],
+  enabled: boolean,
+): PathEdit[] {
+  return [{ path: mapPath, value: enabled ? seedThinkingLevelMap() : undefined }];
+}
+
+/** Set/delete one level's provider value (`undefined` deletes it → provider default). */
+export function thinkingLevelEdits(
+  mapPath: (string | number)[],
+  level: string,
+  value: JsonValue | undefined,
+): PathEdit[] {
+  return [{ path: [...mapPath, level], value }];
+}
+
 function modelsPath(providerId: string): (string | number)[] {
   return ["providers", providerId, "models"];
 }

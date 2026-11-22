@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { JsonValue, PathEdit } from "../../core/types";
 import { CostEditor, NumInput } from "./CostEditor";
 import { JsonField } from "./JsonField";
+import { ThinkingLevelEditor } from "./ThinkingLevelEditor";
 
 type Obj = { [k: string]: JsonValue };
 
@@ -39,7 +40,6 @@ const JSON_KEYS = [
   "compat",
   "samplingParams",
   "samplingParamsByThinkingLevel",
-  "thinkingLevelMap",
   "inputLimits",
   "promptCache",
 ] as const;
@@ -192,6 +192,12 @@ export function ModelEditor({
           input: image
         </label>
       </div>
+
+      <ThinkingLevelEditor
+        map={entry["thinkingLevelMap"]}
+        mapPath={[...entryPath, "thinkingLevelMap"]}
+        apply={apply}
+      />
 
       <CostEditor cost={entry["cost"]} costPath={[...entryPath, "cost"]} apply={apply} />
 
