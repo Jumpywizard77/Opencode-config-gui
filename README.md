@@ -140,7 +140,7 @@ and built UI) next to it.
 ## About this code
 
 This codebase was written almost entirely by AI coding agents, directed and
-reviewed by a human who mostly just said "sir, yes sir." Expect it to work —
+reviewed by a human who mostly just said "That looks good, do it." Expect it to work —
 134 tests and several review passes say so — but extend it at your own risk,
 and keep the same sense of humor in the pull requests.
 
